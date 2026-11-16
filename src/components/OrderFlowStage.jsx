@@ -125,8 +125,8 @@ export function OrderFlowStage({ onScrollToY }) {
       onMilestone={handleMilestone}
     >
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-2xl">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-xl">
             <h2 className="font-display text-3xl font-bold text-ink sm:text-4xl">
               Alur Pemesanan Tanpa Risiko Stok Kosong
             </h2>
@@ -137,7 +137,7 @@ export function OrderFlowStage({ onScrollToY }) {
           </div>
 
           <div
-            className="flex flex-wrap gap-1.5"
+            className="flex flex-wrap gap-1.5 lg:shrink-0"
             role="tablist"
             aria-label="Pilih tahap alur pemesanan"
           >
@@ -570,23 +570,23 @@ export function OrderFlowStage({ onScrollToY }) {
                         width="23"
                         height="14"
                         rx="2.5"
-                        fill="#171614"
+                        fill="currentColor"
                       />
                       <path d="M25 5h6l4 5v5H25z" fill="#C83E2B" />
                       <circle
                         cx="8"
                         cy="17"
                         r="3.4"
-                        fill="#FFFFFF"
-                        stroke="#171614"
+                        fill="var(--cm-card)"
+                        stroke="currentColor"
                         strokeWidth="2"
                       />
                       <circle
                         cx="29"
                         cy="17"
                         r="3.4"
-                        fill="#FFFFFF"
-                        stroke="#171614"
+                        fill="var(--cm-card)"
+                        stroke="currentColor"
                         strokeWidth="2"
                       />
                     </svg>

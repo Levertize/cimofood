@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { DoodleBackdrop } from "./DoodleBackdrop";
 
 export function ScrollTrack({
   id,
@@ -72,8 +73,13 @@ export function ScrollTrack({
 
   return (
     <section id={id} ref={trackRef} className={className}>
-      <div ref={stickyRef} className={stickyClassName} style={{ "--p": 0 }}>
-        {children}
+      <div
+        ref={stickyRef}
+        className={`relative overflow-hidden ${stickyClassName}`}
+        style={{ "--p": 0 }}
+      >
+        <DoodleBackdrop />
+        <div className="relative z-10 w-full">{children}</div>
       </div>
     </section>
   );

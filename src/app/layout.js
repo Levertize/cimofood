@@ -24,9 +24,15 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="id"
+      suppressHydrationWarning
       className={`${fraunces.variable} ${jakarta.variable} antialiased`}
     >
       <body className="min-h-dvh flex flex-col bg-canvas text-ink font-sans">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("cimofood_theme");if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;}}catch(e){}})();`,
+          }}
+        />
         <a href="#main-content" className="skip-link">
           Langsung ke konten utama
         </a>

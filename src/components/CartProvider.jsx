@@ -152,7 +152,7 @@ export function CartProvider({ children }) {
       {drawerOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div
-            className="fixed inset-0 bg-ink/50"
+            className="fixed inset-0 bg-[#121110]/60 backdrop-blur-[1px]"
             onClick={() => setDrawerOpen(false)}
             aria-hidden="true"
           />

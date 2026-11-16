@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -7,10 +7,10 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { ReactLenis } from "lenis/react";
 import { PACKING_LAYERS } from "@/lib/constants";
-import { formatRupiah, normalizeWhatsapp } from "@/lib/pricing";
-import { useCart } from "./CartProvider";
+import { normalizeWhatsapp } from "@/lib/pricing";
 import { ScrollTrack } from "./ScrollTrack";
 import { OrderFlowStage } from "./OrderFlowStage";
+import { VarianShowcase } from "./VarianShowcase";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -35,24 +35,8 @@ export function LandingExperience({ products, settings }) {
   const containerRef = useRef(null);
   const lenisRef = useRef(null);
   const lastBeatRef = useRef(0);
-  const { addItem } = useCart();
 
-  const varianProducts = products.filter((p) => p.category === "varian");
   const hampersProduct = products.find((p) => p.category === "hampers");
-
-  const [selectedProductId, setSelectedProductId] = useState(
-    varianProducts[0]?.id || ""
-  );
-  const activeProduct =
-    varianProducts.find((p) => p.id === selectedProductId) || varianProducts[0];
-
-  const [selectedVariantId, setSelectedVariantId] = useState(
-    activeProduct?.variants?.[0]?.id || ""
-  );
-
-  const activeVariant =
-    activeProduct?.variants?.find((v) => v.id === selectedVariantId) ||
-    activeProduct?.variants?.[0];
 
   const [sopBeat, setSopBeat] = useState(0);
 
@@ -101,45 +85,6 @@ export function LandingExperience({ products, settings }) {
             stagger: 0.1,
             ease: "power3.out",
             clearProps: "transform",
-          });
-
-          // Etalase varian muncul bertahap saat di-scroll
-          gsap.from(".varian-heading-reveal", {
-            y: 26,
-            opacity: 0,
-            duration: 0.6,
-            ease: "power2.out",
-            scrollTrigger: {
-              trigger: "#varian",
-              start: "top 80%",
-              once: true,
-            },
-          });
-
-          gsap.from(".varian-panel-reveal", {
-            y: 30,
-            opacity: 0,
-            duration: 0.65,
-            ease: "power2.out",
-            scrollTrigger: {
-              trigger: ".varian-panel-reveal",
-              start: "top 82%",
-              once: true,
-            },
-          });
-
-          gsap.from(".varian-item-reveal", {
-            x: 24,
-            opacity: 0,
-            duration: 0.45,
-            stagger: 0.09,
-            ease: "power2.out",
-            clearProps: "transform",
-            scrollTrigger: {
-              trigger: ".varian-list-wrap",
-              start: "top 82%",
-              once: true,
-            },
           });
 
           // Mobile saja: inisialisasi panggung SOP pada tahap 01 agar interaksi ketuk tetap berurutan
@@ -207,28 +152,6 @@ export function LandingExperience({ products, settings }) {
     },
     { scope: containerRef }
   );
-
-  const handleSelectProduct = contextSafe((product) => {
-    setSelectedProductId(product.id);
-    const firstAvailable =
-      product.variants?.find((v) => v.is_available) || product.variants?.[0];
-    setSelectedVariantId(firstAvailable?.id || "");
-
-    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      gsap.fromTo(
-        ".variant-focus-media",
-        { opacity: 0.45, scale: 0.96, y: 10 },
-        {
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          duration: 0.35,
-          ease: "power2.out",
-          clearProps: "transform",
-        }
-      );
-    }
-  });
 
   const runMobileSopTween = contextSafe((beatIdx) => {
     const cameraStates = [
@@ -444,179 +367,17 @@ export function LandingExperience({ products, settings }) {
           </div>
         </section>
 
-        {/* 3. Etalase Varian Interaktif (Muncul Bertahap Saat Scroll) */}
-        <section
-          id="varian"
-          className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:py-20"
-        >
-          <div className="varian-heading-reveal mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="max-w-xl">
-              <h2 className="font-display text-3xl font-bold text-ink sm:text-4xl">
-                Pilih Rasa &amp; Ukuran Kemasan
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted sm:text-base">
-                Tersedia kemasan 200 g, 250 g, 500 g, hingga bal 2 kg untuk
-                camilan harian, oleh-oleh, maupun stok jual kembali.
-              </p>
-            </div>
-            <Link
-              href="/katalog"
-              className="min-h-11 inline-flex items-center self-start rounded-md border border-control bg-surface px-4 text-sm font-semibold text-ink hover:bg-sand"
-            >
-              Lihat Semua di Katalog
-            </Link>
-          </div>
-
-          {activeProduct && (
-            <div className="grid gap-8 lg:grid-cols-12">
-              <div className="varian-panel-reveal lg:col-span-7 rounded-2xl border border-subtle bg-surface p-5 sm:p-7">
-                <div className="grid gap-6 sm:grid-cols-12 sm:items-center">
-                  <div className="variant-focus-media sm:col-span-5 overflow-hidden rounded-xl border border-subtle bg-sand aspect-[4/3]">
-                    <img
-                      src={
-                        activeProduct.image_url ||
-                        "/placeholders/product-placeholder.svg"
-                      }
-                      alt={`Foto ${activeProduct.name}`}
-                      width="600"
-                      height="450"
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-7 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="font-display text-2xl font-bold text-ink">
-                        {activeProduct.name}
-                      </h3>
-                      {activeVariant && (
-                        <span
-                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                            activeVariant.is_available
-                              ? "bg-forest text-white"
-                              : "bg-sand text-muted border border-control"
-                          }`}
-                        >
-                          {activeVariant.is_available ? "Stok Siap" : "Kosong"}
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="text-sm leading-relaxed text-muted">
-                      {activeProduct.description}
-                    </p>
-
-                    <div>
-                      <p className="text-xs font-semibold text-ink">
-                        Pilih Ukuran Kemasan
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {(activeProduct.variants || []).map((v) => {
-                          const selected = v.id === activeVariant?.id;
-                          return (
-                            <button
-                              key={v.id}
-                              type="button"
-                              onClick={() => setSelectedVariantId(v.id)}
-                              className={`min-h-11 rounded-md border px-3.5 text-sm font-semibold transition-colors ${
-                                selected
-                                  ? "border-ink bg-ink text-canvas"
-                                  : "border-control bg-canvas text-ink hover:bg-sand"
-                              }`}
-                            >
-                              {v.size_label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {activeVariant && (
-                      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-subtle pt-4">
-                        <div>
-                          <p className="text-xs text-muted">
-                            Harga Web ({activeVariant.size_label})
-                          </p>
-                          <p className="text-2xl font-bold text-ink tabular-nums">
-                            {formatRupiah(activeVariant.sell_price)}
-                          </p>
-                          {activeVariant.stock_note && (
-                            <p className="text-xs text-amber-ink">
-                              Catatan: {activeVariant.stock_note}
-                            </p>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={!activeVariant.is_available}
-                          onClick={() =>
-                            addItem(activeProduct, activeVariant, 1)
-                          }
-                          className="min-h-11 rounded-full bg-chili px-5 py-2.5 text-sm font-semibold text-white hover:bg-chili-hover disabled:bg-sand disabled:text-muted"
-                        >
-                          {activeVariant.is_available
-                            ? "Tambah ke Keranjang"
-                            : "Belum Tersedia"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="varian-list-wrap lg:col-span-5">
-                <div
-                  className="space-y-2.5"
-                  role="listbox"
-                  aria-label="Pilih varian rasa Cimoring"
-                >
-                  {varianProducts.map((product) => {
-                    const isSelected = product.id === activeProduct.id;
-                    const anyAvailable = (product.variants || []).some(
-                      (v) => v.is_available
-                    );
-                    const minPrice = Math.min(
-                      ...(product.variants || []).map((v) => v.sell_price)
-                    );
-                    return (
-                      <button
-                        key={product.id}
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        onClick={() => handleSelectProduct(product)}
-                        className={`varian-item-reveal flex w-full min-h-11 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-                          isSelected
-                            ? "border-ink bg-sand"
-                            : "border-subtle bg-surface hover:border-control hover:bg-canvas"
-                        }`}
-                      >
-                        <div>
-                          <p className="font-semibold text-ink">
-                            {product.name}
-                          </p>
-                          <p className="text-xs text-muted">
-                            {anyAvailable
-                              ? `Mulai ${formatRupiah(minPrice)}`
-                              : "Menunggu konfirmasi stok"}
-                          </p>
-                        </div>
-                        <span
-                          className={`text-xs font-semibold ${
-                            isSelected ? "text-chili-hover" : "text-muted"
-                          }`}
-                        >
-                          {isSelected ? "Aktif" : "Pilih"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
+        {/* 3. Etalase Varian Berbasis Scroll (terhubung ke katalog) */}
+        <VarianShowcase
+          products={products}
+          onScrollToY={(y) => {
+            if (lenisRef.current?.lenis) {
+              lenisRef.current.lenis.scrollTo(y, { duration: 0.75 });
+            } else {
+              window.scrollTo({ top: y, behavior: "smooth" });
+            }
+          }}
+        />
 
         {/* 4. SOP Kemasan 4 Lapis (Sticky Scroll Track 310svh Berbasis --p) */}
         <ScrollTrack
@@ -711,10 +472,10 @@ export function LandingExperience({ products, settings }) {
                               cx="8"
                               cy="8"
                               r="5.5"
-                              fill="#FFFFFF"
-                              fillOpacity="0.5"
-                              stroke="#1F4E3D"
-                              strokeOpacity="0.38"
+                              fill="var(--sop-bubble-bg)"
+                              fillOpacity="0.55"
+                              stroke="var(--sop-green)"
+                              strokeOpacity="0.42"
                               strokeWidth="1"
                             />
                           </pattern>
@@ -729,8 +490,8 @@ export function LandingExperience({ products, settings }) {
                               y1="0"
                               x2="3"
                               y2="20"
-                              stroke="#9A7446"
-                              strokeOpacity="0.4"
+                              stroke="var(--sop-bubble-dot)"
+                              strokeOpacity="0.45"
                               strokeWidth="1.2"
                             />
                           </pattern>
@@ -742,7 +503,7 @@ export function LandingExperience({ products, settings }) {
                           y1="316"
                           x2="432"
                           y2="316"
-                          stroke="#E5DEC9"
+                          stroke="var(--sop-grid)"
                           strokeWidth="2"
                         />
 
@@ -755,7 +516,7 @@ export function LandingExperience({ products, settings }) {
                             height="264"
                             rx="22"
                             fill="url(#sop-bubble-grid)"
-                            stroke="#1F4E3D"
+                            stroke="var(--sop-green)"
                             strokeWidth="2"
                             strokeDasharray="7 5"
                           />
@@ -776,7 +537,7 @@ export function LandingExperience({ products, settings }) {
                             width="248"
                             height="228"
                             rx="12"
-                            fill="#E5C9A3"
+                            fill="var(--sop-kraft)"
                             fillOpacity="0.52"
                             filter="url(#cimofood-kraft)"
                           />
@@ -787,7 +548,7 @@ export function LandingExperience({ products, settings }) {
                             height="228"
                             rx="12"
                             fill="none"
-                            stroke="#9A4206"
+                            stroke="var(--sop-kraft-stroke)"
                             strokeWidth="2.5"
                             pathLength="100"
                             className="sop-draw-line"
@@ -798,7 +559,7 @@ export function LandingExperience({ products, settings }) {
                             y1="96"
                             x2="364"
                             y2="96"
-                            stroke="#9A4206"
+                            stroke="var(--sop-kraft-stroke)"
                             strokeOpacity="0.45"
                             strokeWidth="1.5"
                             pathLength="100"
@@ -810,7 +571,7 @@ export function LandingExperience({ products, settings }) {
                             y1="264"
                             x2="364"
                             y2="264"
-                            stroke="#9A4206"
+                            stroke="var(--sop-kraft-stroke)"
                             strokeOpacity="0.45"
                             strokeWidth="1.5"
                             pathLength="100"
@@ -833,7 +594,7 @@ export function LandingExperience({ products, settings }) {
                             width="112"
                             height="14"
                             rx="3"
-                            fill="#B45309"
+                            fill="var(--sop-amber)"
                           />
                         </g>
 
@@ -852,8 +613,8 @@ export function LandingExperience({ products, settings }) {
                             width="24"
                             height="196"
                             rx="4"
-                            fill="#D4AE7D"
-                            stroke="#171614"
+                            fill="var(--sop-kraft-strong)"
+                            stroke="var(--sop-ink)"
                             strokeWidth="2"
                             filter="url(#cimofood-kraft)"
                           />
@@ -879,8 +640,8 @@ export function LandingExperience({ products, settings }) {
                             width="24"
                             height="196"
                             rx="4"
-                            fill="#D4AE7D"
-                            stroke="#171614"
+                            fill="var(--sop-kraft-strong)"
+                            stroke="var(--sop-ink)"
                             strokeWidth="2"
                             filter="url(#cimofood-kraft)"
                           />
@@ -899,7 +660,7 @@ export function LandingExperience({ products, settings }) {
                           <path
                             d="M114 180 L128 180 M123 175 L129 180 L123 185"
                             fill="none"
-                            stroke="#1F4E3D"
+                            stroke="var(--sop-green)"
                             strokeWidth="2.2"
                             strokeLinecap="round"
                             pathLength="100"
@@ -909,7 +670,7 @@ export function LandingExperience({ products, settings }) {
                           <path
                             d="M366 180 L352 180 M357 175 L351 180 L357 185"
                             fill="none"
-                            stroke="#1F4E3D"
+                            stroke="var(--sop-green)"
                             strokeWidth="2.2"
                             strokeLinecap="round"
                             pathLength="100"
@@ -922,8 +683,8 @@ export function LandingExperience({ products, settings }) {
                         <g>
                           <path
                             d="M174 84 H306 L312 268 C312 274 307 278 301 278 H179 C173 278 168 274 168 268 Z"
-                            fill="#FAF8F4"
-                            stroke="#171614"
+                            fill="var(--sop-bg)"
+                            stroke="var(--sop-ink)"
                             strokeWidth="2.5"
                           />
                           <rect
@@ -932,8 +693,8 @@ export function LandingExperience({ products, settings }) {
                             width="112"
                             height="104"
                             rx="8"
-                            fill="#F2EDE4"
-                            stroke="#857D71"
+                            fill="var(--sop-card)"
+                            stroke="var(--sop-border)"
                             strokeWidth="1.5"
                           />
                           <circle cx="240" cy="170" r="14" fill="#C83E2B" />
@@ -944,7 +705,7 @@ export function LandingExperience({ products, settings }) {
                             fontFamily="Georgia, serif"
                             fontSize="15"
                             fontWeight="700"
-                            fill="#171614"
+                            fill="var(--sop-ink)"
                           >
                             CIMORING
                           </text>
@@ -955,7 +716,7 @@ export function LandingExperience({ products, settings }) {
                             fontFamily="sans-serif"
                             fontSize="10"
                             fontWeight="600"
-                            fill="#57534E"
+                            fill="var(--sop-muted)"
                           >
                             HALAL · PIRT
                           </text>
@@ -967,7 +728,7 @@ export function LandingExperience({ products, settings }) {
                           y1="96"
                           x2="305"
                           y2="96"
-                          stroke="#1F4E3D"
+                          stroke="var(--sop-green)"
                           strokeWidth="10"
                           strokeLinecap="round"
                           pathLength="100"
@@ -981,7 +742,7 @@ export function LandingExperience({ products, settings }) {
                             width="168"
                             height="22"
                             rx="5"
-                            fill="#171614"
+                            fill="var(--sop-sealer-fill)"
                           />
                           <rect
                             x="172"
@@ -998,7 +759,7 @@ export function LandingExperience({ products, settings }) {
                             fontFamily="sans-serif"
                             fontSize="10"
                             fontWeight="700"
-                            fill="#FAF8F4"
+                            fill="var(--sop-sealer-text)"
                           >
                             MESIN SEALER
                           </text>
@@ -1044,13 +805,13 @@ export function LandingExperience({ products, settings }) {
                             y1="53"
                             x2="240"
                             y2="92"
-                            stroke="#1F4E3D"
+                            stroke="var(--sop-green)"
                             strokeWidth="1.8"
                             pathLength="100"
                             className="sop-draw-line"
                             style={{ "--start": 0.85, "--span": 0.07 }}
                           />
-                          <circle cx="240" cy="40" r="13" fill="#1F4E3D" />
+                          <circle cx="240" cy="40" r="13" fill="var(--sop-green)" />
                           <text
                             x="240"
                             y="44"
@@ -1058,7 +819,7 @@ export function LandingExperience({ products, settings }) {
                             fontFamily="sans-serif"
                             fontSize="11"
                             fontWeight="700"
-                            fill="#FFFFFF"
+                            fill="var(--sop-ink-inverse)"
                           >
                             1
                           </text>
@@ -1068,13 +829,13 @@ export function LandingExperience({ products, settings }) {
                             y1="180"
                             x2="134"
                             y2="180"
-                            stroke="#B45309"
+                            stroke="var(--sop-amber)"
                             strokeWidth="1.8"
                             pathLength="100"
                             className="sop-draw-line"
                             style={{ "--start": 0.86, "--span": 0.07 }}
                           />
-                          <circle cx="72" cy="180" r="13" fill="#B45309" />
+                          <circle cx="72" cy="180" r="13" fill="var(--sop-amber)" />
                           <text
                             x="72"
                             y="184"
@@ -1082,7 +843,7 @@ export function LandingExperience({ products, settings }) {
                             fontFamily="sans-serif"
                             fontSize="11"
                             fontWeight="700"
-                            fill="#FFFFFF"
+                            fill="var(--sop-ink-inverse)"
                           >
                             2
                           </text>
@@ -1092,13 +853,13 @@ export function LandingExperience({ products, settings }) {
                             y1="128"
                             x2="364"
                             y2="128"
-                            stroke="#9A4206"
+                            stroke="var(--sop-kraft-stroke)"
                             strokeWidth="1.8"
                             pathLength="100"
                             className="sop-draw-line"
                             style={{ "--start": 0.87, "--span": 0.07 }}
                           />
-                          <circle cx="408" cy="128" r="13" fill="#9A4206" />
+                          <circle cx="408" cy="128" r="13" fill="var(--sop-kraft-stroke)" />
                           <text
                             x="408"
                             y="132"
@@ -1106,7 +867,7 @@ export function LandingExperience({ products, settings }) {
                             fontFamily="sans-serif"
                             fontSize="11"
                             fontWeight="700"
-                            fill="#FFFFFF"
+                            fill="var(--sop-ink-inverse)"
                           >
                             3
                           </text>
@@ -1116,13 +877,13 @@ export function LandingExperience({ products, settings }) {
                             y1="224"
                             x2="384"
                             y2="224"
-                            stroke="#171614"
+                            stroke="var(--sop-ink)"
                             strokeWidth="1.8"
                             pathLength="100"
                             className="sop-draw-line"
                             style={{ "--start": 0.88, "--span": 0.07 }}
                           />
-                          <circle cx="408" cy="224" r="13" fill="#171614" />
+                          <circle cx="408" cy="224" r="13" fill="var(--sop-ink)" />
                           <text
                             x="408"
                             y="228"
@@ -1130,7 +891,7 @@ export function LandingExperience({ products, settings }) {
                             fontFamily="sans-serif"
                             fontSize="11"
                             fontWeight="700"
-                            fill="#FFFFFF"
+                            fill="var(--sop-ink-inverse)"
                           >
                             4
                           </text>
@@ -1243,12 +1004,12 @@ export function LandingExperience({ products, settings }) {
         {/* 6. Jalur Reseller & Paket Hampers */}
         <section className="mx-auto max-w-6xl border-t border-subtle px-4 pt-14 pb-16 sm:px-6 lg:pt-20 lg:pb-24">
           <div className="closing-grid grid gap-6 lg:grid-cols-12">
-            <div className="closing-block-reveal lg:col-span-7 flex flex-col justify-between rounded-2xl bg-forest p-7 text-canvas sm:p-9">
+            <div className="closing-block-reveal lg:col-span-7 flex flex-col justify-between rounded-2xl bg-forest p-7 text-white sm:p-9">
               <div className="space-y-3">
                 <h2 className="font-display text-3xl font-bold text-white">
                   Ingin Jual Ulang Cimoring di Sekitarmu?
                 </h2>
-                <p className="max-w-lg text-sm leading-relaxed text-canvas/90 sm:text-base">
+                <p className="max-w-lg text-sm leading-relaxed text-white/90 sm:text-base">
                   UMKM Cimoring melayani reseller dan dropshipper tanpa minimal
                   order dengan harga grosir khusus. Pengiriman jarak jauh tetap
                   dibantu pengemasan aman oleh tim CimoFood.

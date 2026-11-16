@@ -15,7 +15,7 @@ export function CatalogView({ products, packingFee }) {
       ? initialCategory
       : "semua"
   );
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("cari") || "");
   const [selectedSizes, setSelectedSizes] = useState(() => {
     const map = {};
     for (const p of products) {

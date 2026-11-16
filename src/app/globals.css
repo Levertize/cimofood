@@ -13,6 +13,90 @@
   --brand-amber-ink: #9a4206;
   --accent-chili: #c83e2b;
   --accent-chili-hover: #b33220;
+  --sop-bg: #faf8f4;
+  --sop-card: #f2ede4;
+  --sop-ink: #171614;
+  --sop-ink-inverse: #ffffff;
+  --sop-muted: #57534e;
+  --sop-border: #857d71;
+  --sop-grid: #e5dec9;
+  --sop-kraft: #e5c9a3;
+  --sop-kraft-strong: #d4ae7d;
+  --sop-kraft-stroke: #9a4206;
+  --sop-green: #1f4e3d;
+  --sop-amber: #b45309;
+  --sop-sealer-fill: #171614;
+  --sop-sealer-text: #faf8f4;
+  --sop-bubble-bg: #ffffff;
+  --sop-bubble-dot: #9a7446;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-canvas: #121110;
+  --bg-surface: #1c1a17;
+  --bg-sand: #25221e;
+  --ink-primary: #f5f2eb;
+  --ink-muted: #b5ada2;
+  --border-control: #787066;
+  --border-subtle: #2e2a25;
+  --brand-forest: #245c48;
+  --brand-amber-bg: #d97706;
+  --brand-amber-ink: #f59e0b;
+  --accent-chili: #c83e2b;
+  --accent-chili-hover: #b33220;
+  --sop-bg: #121110;
+  --sop-card: #25221e;
+  --sop-ink: #f5f2eb;
+  --sop-ink-inverse: #121110;
+  --sop-muted: #b5ada2;
+  --sop-border: #787066;
+  --sop-grid: #2e2a25;
+  --sop-kraft: #5c4328;
+  --sop-kraft-strong: #7a5833;
+  --sop-kraft-stroke: #f59e0b;
+  --sop-green: #34d399;
+  --sop-amber: #fbbf24;
+  --sop-sealer-fill: #2e2a25;
+  --sop-sealer-text: #f5f2eb;
+  --sop-bubble-bg: #18231e;
+  --sop-bubble-dot: #34d399;
+}
+
+html[data-theme="dark"] .text-forest {
+  color: #6ee7b7;
+}
+
+html[data-theme="dark"] .text-chili-hover {
+  color: #f87171;
+}
+
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+@keyframes cimofood-theme-reveal {
+  from {
+    clip-path: circle(0px at var(--theme-x, 90%) var(--theme-y, 32px));
+  }
+  to {
+    clip-path: circle(150vmax at var(--theme-x, 90%) var(--theme-y, 32px));
+  }
+}
+
+::view-transition-old(root) {
+  animation: none;
+}
+
+::view-transition-new(root) {
+  animation: cimofood-theme-reveal 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @theme inline {
@@ -127,8 +211,30 @@ html.lenis body {
   animation-play-state: paused;
 }
 
+.doodle-pattern-layer {
+  color: var(--ink-primary);
+  opacity: 0.038;
+  mask-image: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.22) 20%,
+    rgba(0, 0, 0, 0.85) 90%
+  );
+}
+
+html[data-theme="dark"] .doodle-pattern-layer {
+  opacity: 0.048;
+}
+
 /* Progres scroll berbasis --p untuk Hero dan Panggung SOP Kemasan */
 @media (min-width: 768px) {
+  .doodle-pattern-layer {
+    transform: translate3d(
+      calc(var(--p, 0) * -32px),
+      calc(var(--p, 0) * -76px),
+      0
+    );
+  }
+
   .hero-scroll-fade {
     --t: clamp(0, calc((var(--p, 0) - var(--start, 0.1)) / var(--span, 0.25)), 1);
     opacity: var(--t);
@@ -261,18 +367,28 @@ html.lenis body {
   .sop-sealer-head {
     opacity: 0 !important;
   }
+
+  .doodle-pattern-layer {
+    transform: none !important;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  .cm-scene.active .cm-scan {
+    animation: none !important;
+  }
 }
 
 /* Alur Pemesanan Berbasis Scroll 5 Tahap (Scoped CimoFood) */
 .cm-flow-shell {
-  --cm-paper: #faf8f4;
-  --cm-ink: #171614;
-  --cm-muted: #57534e;
-  --cm-red: #c83e2b;
-  --cm-line: #e7e1d6;
-  --cm-soft: #f2ede4;
-  --cm-card: #ffffff;
-  --cm-ok: #1f4e3d;
+  --cm-paper: var(--bg-canvas);
+  --cm-ink: var(--ink-primary);
+  --cm-muted: var(--ink-muted);
+  --cm-red: var(--accent-chili);
+  --cm-line: var(--border-subtle);
+  --cm-soft: var(--bg-sand);
+  --cm-card: var(--bg-surface);
+  --cm-ok: var(--brand-forest);
   --cm-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
   --cm-body: var(--font-jakarta), system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -433,7 +549,7 @@ html.lenis body {
   padding: 0.5em 0.95em;
   border: 1px solid var(--cm-line);
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--cm-card);
   font-weight: 600;
   color: var(--cm-ink);
   white-space: nowrap;
@@ -514,7 +630,7 @@ html.lenis body {
   --press: clamp(0, calc((var(--s, 0) - 0.72) / 0.06), 1);
   --release: clamp(0, calc((var(--s, 0) - 0.78) / 0.06), 1);
   background: var(--cm-ink);
-  color: #ffffff;
+  color: var(--cm-paper);
   border-radius: 999px;
   padding: 0.78em 1.2em;
   font-weight: 700;
@@ -667,22 +783,36 @@ html.lenis body {
 }
 
 .cm-qr i.on {
-  background: var(--cm-ink);
+  background: #171614;
+}
+
+@keyframes cm-qr-sweep {
+  0%,
+  100% {
+    transform: translateY(-10px);
+  }
+  50% {
+    transform: translateY(10px);
+  }
 }
 
 .cm-scan {
-  --down: clamp(0, calc((var(--s, 0) - 0.18) / 0.16), 1);
-  --up: clamp(0, calc((var(--s, 0) - 0.34) / 0.16), 1);
-  --vis-on: clamp(0, calc((var(--s, 0) - 0.16) / 0.04), 1);
-  --vis-off: clamp(0, calc((var(--s, 0) - 0.48) / 0.05), 1);
+  --down: clamp(0, calc((var(--s, 0) - 0.14) / 0.3), 1);
+  --up: clamp(0, calc((var(--s, 0) - 0.44) / 0.3), 1);
+  --vis-on: clamp(0, calc((var(--s, 0) - 0.12) / 0.06), 1);
+  --vis-off: clamp(0, calc((var(--s, 0) - 0.86) / 0.08), 1);
   position: absolute;
   left: 0.3em;
   right: 0.3em;
-  top: calc((var(--down) - var(--up)) * 92%);
+  top: calc(4% + (var(--down) * 86%) - (var(--up) * 56%));
   height: 2.5px;
   background: var(--cm-red);
   opacity: calc(var(--vis-on) * (1 - var(--vis-off)));
   box-shadow: 0 0 8px var(--cm-red);
+}
+
+.cm-scene.active .cm-scan {
+  animation: cm-qr-sweep 2.2s ease-in-out infinite;
 }
 
 .cm-paytxt b {
@@ -714,7 +844,7 @@ html.lenis body {
   width: 2.5em;
   height: 2.5em;
   border-radius: 0.6em;
-  background: #ffffff;
+  background: var(--cm-card);
   border: 1px solid var(--cm-line);
   display: grid;
   place-items: center;
@@ -973,7 +1103,7 @@ html.lenis body {
     gap: 16px;
     border-radius: 20px;
     border: 1px solid var(--cm-line);
-    background: #faf8f4;
+    background: var(--cm-paper);
     padding: 20px;
   }
 
@@ -983,7 +1113,266 @@ html.lenis body {
   }
 }
 
+html[data-theme="dark"] .cm-sw {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+html[data-theme="dark"] .cm-status {
+  color: #6ee7b7;
+}
+
+html[data-theme="dark"] .cm-eyebrow,
+html[data-theme="dark"] .cm-layers .n {
+  color: #f87171;
+  border-color: #f87171;
+}
+
+html[data-theme="dark"] .cm-bub.out {
+  background: #3a201c;
+  color: #f5f2eb;
+}
+
+html[data-theme="dark"] .cm-pill,
+html[data-theme="dark"] .cm-chip.ok {
+  background: #19382d;
+  border-color: #285947;
+  color: #86efac;
+}
+
+html[data-theme="dark"] .cm-ln,
+html[data-theme="dark"] .cm-bar,
+html[data-theme="dark"] .cm-rail,
+html[data-theme="dark"] .cm-dot {
+  background: #332e28;
+}
+
+html[data-theme="dark"] .cm-ln.dark i {
+  background: #787066;
+}
+
+html[data-theme="dark"] .cm-L4 {
+  fill: #26221d;
+  stroke: #4a4238;
+}
+
+html[data-theme="dark"] .cm-L3 {
+  fill: #302b24;
+  stroke: #5c5246;
+}
+
+html[data-theme="dark"] .cm-L2 {
+  fill: #1c1a17;
+  stroke: #787066;
+}
+
+/* Etalase Varian Berbasis Scroll (Scoped CimoFood) */
+.vr-rail {
+  transform: scaleX(clamp(0.03, var(--p, 0), 1));
+}
+
+.vr-stage {
+  --seg: calc(var(--p, 0) * var(--n, 5));
+  --segc: clamp(0.5, var(--seg), calc(var(--n, 5) - 0.5));
+  isolation: isolate;
+}
+
+.vr-ring {
+  transform: translate(-50%, -50%) rotate(calc(var(--p, 0) * 200deg));
+}
+
+.vr-slot {
+  --v: clamp(0, calc(var(--seg) - var(--i, 0)), 1);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: translate3d(0, 14px, 0) scale(0.96);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+  pointer-events: none;
+}
+
+.vr-blob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 64%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0.16;
+  transform: translate(-50%, -50%);
+}
+
+.vr-float {
+  position: relative;
+  width: 54%;
+}
+
+.vr-pouch {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 10px 14px rgba(40, 20, 10, 0.22));
+}
+
+.vr-chip {
+  position: absolute;
+  display: block;
+  aspect-ratio: 1;
+}
+
+.vr-chip svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: vr-bob 4.8s ease-in-out var(--d, 0s) infinite;
+}
+
+.vr-detail,
+.vr-photo {
+  animation: vr-in 0.4s ease-out;
+}
+
+@keyframes vr-bob {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -7px, 0) rotate(6deg);
+  }
+}
+
+@keyframes vr-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+}
+
+@media (min-width: 768px) {
+  .vr-slot {
+    --dist: max(
+      calc(var(--segc) - var(--i, 0) - 0.5),
+      calc(var(--i, 0) + 0.5 - var(--segc))
+    );
+    --k: clamp(0, calc((0.56 - var(--dist)) * 8), 1);
+    opacity: var(--k);
+    transform: translate3d(
+        calc((var(--segc) - var(--i, 0) - 0.5) * -70px),
+        calc((1 - var(--k)) * 18px),
+        0
+      )
+      scale(calc(0.92 + (0.08 * var(--k))));
+    transition: none;
+  }
+
+  .vr-float {
+    transform: translate3d(0, calc((0.5 - var(--v)) * 22px), 0)
+      rotate(calc((var(--v) - 0.5) * 8deg));
+  }
+
+  .vr-blob {
+    transform: translate(-50%, -50%) scale(calc(0.86 + (var(--v) * 0.26)));
+  }
+
+  .vr-chip {
+    transform: translate3d(
+        calc(var(--p, 0) * var(--dx, 0px)),
+        calc(var(--p, 0) * var(--dy, 0px)),
+        0
+      )
+      rotate(calc(var(--p, 0) * var(--r, 0deg)));
+  }
+}
+
+@media (max-width: 767px) {
+  .vr-slot.is-active {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Partikel mikro latar: kilau, remah, biji, cabai, daun (parallax 3 kedalaman) */
+.spark-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.spark {
+  position: absolute;
+  animation: spark-twinkle var(--dur, 5s) ease-in-out var(--delay, 0s) infinite;
+}
+
+.spark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes spark-twinkle {
+  0%,
+  100% {
+    opacity: 0.18;
+    transform: scale(0.82) rotate(0deg);
+  }
+  50% {
+    opacity: 0.62;
+    transform: scale(1.12) rotate(16deg);
+  }
+}
+
+@media (min-width: 768px) {
+  .spark-layer {
+    transform: translate3d(0, calc(var(--p, 0) * var(--sy, -60px)), 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  #varian {
+    height: auto !important;
+  }
+
+  #varian > div {
+    position: static !important;
+    min-height: 0 !important;
+  }
+
+  .vr-slot {
+    opacity: 0;
+    transform: none;
+    transition: none;
+  }
+
+  .vr-slot.is-active {
+    opacity: 1;
+  }
+
+  .vr-float,
+  .vr-chip {
+    transform: none;
+  }
+
+  .vr-blob,
+  .vr-ring {
+    transform: translate(-50%, -50%);
+  }
+
+  .vr-chip svg,
+  .vr-detail,
+  .vr-photo {
+    animation: none;
+  }
+
+  .spark {
+    animation: none;
+    opacity: 0.3;
+  }
+
+  .spark-layer {
+    transform: none !important;
+  }
+
   #alur-pemesanan {
     height: auto !important;
   }
