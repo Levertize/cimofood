@@ -4,13 +4,11 @@ import { useCallback, useRef, useState } from "react";
 import { ScrollTrack } from "./ScrollTrack";
 
 const ORDER_BEATS = [
-  { id: 0, label: "Intro", status: "Cara Pesan", start: 0, len: 0.155, targetP: 0.085 },
-  { id: 1, label: "01", status: "Tahap 01 / 05", start: 0.135, len: 0.17, targetP: 0.27 },
-  { id: 2, label: "02", status: "Tahap 02 / 05", start: 0.285, len: 0.17, targetP: 0.42 },
-  { id: 3, label: "03", status: "Tahap 03 / 05", start: 0.435, len: 0.17, targetP: 0.57 },
-  { id: 4, label: "04", status: "Tahap 04 / 05", start: 0.585, len: 0.17, targetP: 0.72 },
-  { id: 5, label: "05", status: "Tahap 05 / 05", start: 0.735, len: 0.165, targetP: 0.865 },
-  { id: 6, label: "Selesai", status: "Selesai", start: 0.88, len: 0.12, targetP: 0.985 },
+  { id: 0, label: "01 Pilih", start: 0, len: 0.22, targetP: 0.16 },
+  { id: 1, label: "02 Konfirmasi", start: 0.19, len: 0.22, targetP: 0.36 },
+  { id: 2, label: "03 Bayar", start: 0.39, len: 0.22, targetP: 0.56 },
+  { id: 3, label: "04 Packing", start: 0.59, len: 0.22, targetP: 0.76 },
+  { id: 4, label: "05 Kirim", start: 0.79, len: 0.21, targetP: 0.96 },
 ];
 
 // Pola QRIS dekoratif 15x15 deterministik (aman SSR & hydration)
@@ -75,19 +73,7 @@ export function OrderFlowStage({ onScrollToY }) {
 
   const handleMilestone = useCallback((p) => {
     const nextBeat =
-      p < 0.14
-        ? 0
-        : p < 0.295
-          ? 1
-          : p < 0.445
-            ? 2
-            : p < 0.595
-              ? 3
-              : p < 0.745
-                ? 4
-                : p < 0.89
-                  ? 5
-                  : 6;
+      p < 0.2 ? 0 : p < 0.4 ? 1 : p < 0.6 ? 2 : p < 0.8 ? 3 : 4;
     if (nextBeat !== lastBeatRef.current) {
       lastBeatRef.current = nextBeat;
       setActiveBeat(nextBeat);
@@ -134,19 +120,19 @@ export function OrderFlowStage({ onScrollToY }) {
   return (
     <ScrollTrack
       id="alur-pemesanan"
-      className="cm-flow-shell border-t border-subtle bg-canvas md:h-[520svh]"
+      className="cm-flow-shell border-t border-subtle bg-canvas md:h-[360svh]"
       stickyClassName="md:sticky md:top-[68px] md:min-h-[calc(100svh-68px)] md:flex md:items-center py-12 md:py-6"
       onMilestone={handleMilestone}
     >
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="inline-flex items-center rounded-full bg-chili px-3 py-1 text-xs font-semibold text-white tabular-nums">
-              {ORDER_BEATS[activeBeat]?.status}
-            </span>
-            <p className="text-xs font-medium text-muted sm:text-sm">
-              Gulir perlahan atau pilih tahap untuk melihat simulasi pesan
-              CimoFood.
+          <div className="max-w-2xl">
+            <h2 className="font-display text-3xl font-bold text-ink sm:text-4xl">
+              Alur Pemesanan Tanpa Risiko Stok Kosong
+            </h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted sm:text-base">
+              Pembeli tidak perlu langsung transfer sebelum stok dan ongkir
+              ekspedisi dipastikan oleh admin.
             </p>
           </div>
 
@@ -182,64 +168,20 @@ export function OrderFlowStage({ onScrollToY }) {
         </div>
 
         <div className="cm-stage">
-          {/* Adegan 0: Intro */}
+          {/* Tahap 01 */}
           <article
             id="alur-scene-0"
             style={{
               "--s-start": ORDER_BEATS[0].start,
               "--s-len": ORDER_BEATS[0].len,
             }}
-            className={`cm-scene intro${activeBeat === 0 ? " active" : ""}`}
+            className={`cm-scene first-scene${activeBeat === 0 ? " active" : ""}`}
           >
             <div className="cm-scene-copy">
-              <p className="cm-eyebrow">Cara pesan</p>
-              <h2 className="cm-display">
-                Alur Pemesanan Tanpa Risiko Stok Kosong
-              </h2>
+              <p className="cm-eyebrow">Tahap 01</p>
+              <h3 className="cm-display">Pilih Varian &amp; Ukuran</h3>
               <div className="cm-redrule" />
               <p className="cm-desc">
-                Pembeli tidak perlu langsung transfer sebelum stok dan ongkir
-                ekspedisi dipastikan oleh admin.
-              </p>
-            </div>
-            <ol className="cm-flow">
-              {[
-                ["01", "Pilih"],
-                ["02", "Konfirmasi"],
-                ["03", "Bayar"],
-                ["04", "Packing"],
-                ["05", "Kirim"],
-              ].map(([no, label], idx) => (
-                <li
-                  key={no}
-                  className="cm-scrub"
-                  style={{ "--a": (0.14 + idx * 0.08).toFixed(2), "--b": 0.14 }}
-                >
-                  <b>{no}</b>
-                  <span>{label}</span>
-                </li>
-              ))}
-            </ol>
-          </article>
-
-          {/* Adegan 1: Tahap 01 */}
-          <article
-            id="alur-scene-1"
-            style={{
-              "--s-start": ORDER_BEATS[1].start,
-              "--s-len": ORDER_BEATS[1].len,
-            }}
-            className={`cm-scene${activeBeat === 1 ? " active" : ""}`}
-          >
-            <div className="cm-scene-copy">
-              <p className="cm-eyebrow cm-scrub" style={{ "--a": 0.06 }}>
-                Tahap 01
-              </p>
-              <h2 className="cm-display cm-scrub" style={{ "--a": 0.1 }}>
-                Pilih Varian &amp; Ukuran
-              </h2>
-              <div className="cm-redrule" />
-              <p className="cm-desc cm-scrub" style={{ "--a": 0.16 }}>
                 Pilih rasa Cimoring dan ukuran (200 g, 250 g, 500 g, atau bal 2
                 kg), lalu isi alamat dan ekspedisi pilihan.
               </p>
@@ -319,22 +261,22 @@ export function OrderFlowStage({ onScrollToY }) {
             </div>
           </article>
 
-          {/* Adegan 2: Tahap 02 */}
+          {/* Tahap 02 */}
           <article
-            id="alur-scene-2"
+            id="alur-scene-1"
             style={{
-              "--s-start": ORDER_BEATS[2].start,
-              "--s-len": ORDER_BEATS[2].len,
+              "--s-start": ORDER_BEATS[1].start,
+              "--s-len": ORDER_BEATS[1].len,
             }}
-            className={`cm-scene${activeBeat === 2 ? " active" : ""}`}
+            className={`cm-scene${activeBeat === 1 ? " active" : ""}`}
           >
             <div className="cm-scene-copy">
               <p className="cm-eyebrow cm-scrub" style={{ "--a": 0.06 }}>
                 Tahap 02
               </p>
-              <h2 className="cm-display cm-scrub" style={{ "--a": 0.1 }}>
+              <h3 className="cm-display cm-scrub" style={{ "--a": 0.1 }}>
                 Konfirmasi Stok &amp; Ongkir via WA
-              </h2>
+              </h3>
               <div className="cm-redrule" />
               <p className="cm-desc cm-scrub" style={{ "--a": 0.16 }}>
                 Admin mengecek stok ke produsen dan memberi total ongkos kirim
@@ -385,22 +327,22 @@ export function OrderFlowStage({ onScrollToY }) {
             </div>
           </article>
 
-          {/* Adegan 3: Tahap 03 */}
+          {/* Tahap 03 */}
           <article
-            id="alur-scene-3"
+            id="alur-scene-2"
             style={{
-              "--s-start": ORDER_BEATS[3].start,
-              "--s-len": ORDER_BEATS[3].len,
+              "--s-start": ORDER_BEATS[2].start,
+              "--s-len": ORDER_BEATS[2].len,
             }}
-            className={`cm-scene${activeBeat === 3 ? " active" : ""}`}
+            className={`cm-scene${activeBeat === 2 ? " active" : ""}`}
           >
             <div className="cm-scene-copy">
               <p className="cm-eyebrow cm-scrub" style={{ "--a": 0.06 }}>
                 Tahap 03
               </p>
-              <h2 className="cm-display cm-scrub" style={{ "--a": 0.1 }}>
+              <h3 className="cm-display cm-scrub" style={{ "--a": 0.1 }}>
                 Transfer / QRIS &amp; Upload Bukti
-              </h2>
+              </h3>
               <div className="cm-redrule" />
               <p className="cm-desc cm-scrub" style={{ "--a": 0.16 }}>
                 Setelah total cocok, transfer atau scan QRIS lalu unggah foto
@@ -468,22 +410,22 @@ export function OrderFlowStage({ onScrollToY }) {
             </div>
           </article>
 
-          {/* Adegan 4: Tahap 04 */}
+          {/* Tahap 04 */}
           <article
-            id="alur-scene-4"
+            id="alur-scene-3"
             style={{
-              "--s-start": ORDER_BEATS[4].start,
-              "--s-len": ORDER_BEATS[4].len,
+              "--s-start": ORDER_BEATS[3].start,
+              "--s-len": ORDER_BEATS[3].len,
             }}
-            className={`cm-scene${activeBeat === 4 ? " active" : ""}`}
+            className={`cm-scene${activeBeat === 3 ? " active" : ""}`}
           >
             <div className="cm-scene-copy">
               <p className="cm-eyebrow cm-scrub" style={{ "--a": 0.06 }}>
                 Tahap 04
               </p>
-              <h2 className="cm-display cm-scrub" style={{ "--a": 0.1 }}>
+              <h3 className="cm-display cm-scrub" style={{ "--a": 0.1 }}>
                 Ambil Barang Segar &amp; Packing SOP
-              </h2>
+              </h3>
               <div className="cm-redrule" />
               <p className="cm-desc cm-scrub" style={{ "--a": 0.16 }}>
                 Tim mengambil produk langsung dari Cimoring setelah pembayaran
@@ -569,22 +511,22 @@ export function OrderFlowStage({ onScrollToY }) {
             </div>
           </article>
 
-          {/* Adegan 5: Tahap 05 */}
+          {/* Tahap 05 */}
           <article
-            id="alur-scene-5"
+            id="alur-scene-4"
             style={{
-              "--s-start": ORDER_BEATS[5].start,
-              "--s-len": ORDER_BEATS[5].len,
+              "--s-start": ORDER_BEATS[4].start,
+              "--s-len": ORDER_BEATS[4].len,
             }}
-            className={`cm-scene${activeBeat === 5 ? " active" : ""}`}
+            className={`cm-scene last-scene${activeBeat === 4 ? " active" : ""}`}
           >
             <div className="cm-scene-copy">
               <p className="cm-eyebrow cm-scrub" style={{ "--a": 0.06 }}>
                 Tahap 05
               </p>
-              <h2 className="cm-display cm-scrub" style={{ "--a": 0.1 }}>
+              <h3 className="cm-display cm-scrub" style={{ "--a": 0.1 }}>
                 Kirim Paket &amp; Pantau Resi
-              </h2>
+              </h3>
               <div className="cm-redrule" />
               <p className="cm-desc cm-scrub" style={{ "--a": 0.16 }}>
                 Nomor resi Anteraja, J&amp;T, atau JNE diinput admin agar bisa
@@ -671,48 +613,6 @@ export function OrderFlowStage({ onScrollToY }) {
                   </div>
                 </div>
               </div>
-            </div>
-          </article>
-
-          {/* Adegan 6: Outro */}
-          <article
-            id="alur-scene-6"
-            style={{
-              "--s-start": ORDER_BEATS[6].start,
-              "--s-len": ORDER_BEATS[6].len,
-            }}
-            className={`cm-scene outro${activeBeat === 6 ? " active" : ""}`}
-          >
-            <div className="cm-scene-copy">
-              <p className="cm-eyebrow cm-scrub" style={{ "--a": 0.05 }}>
-                Selesai
-              </p>
-              <h2 className="cm-display cm-scrub" style={{ "--a": 0.12 }}>
-                Stok dipastikan dulu, baru kamu bayar.
-              </h2>
-              <div className="cm-redrule" />
-              <p className="cm-desc cm-scrub" style={{ "--a": 0.22 }}>
-                Pantau pesananmu sampai paket tiba renyah.
-              </p>
-            </div>
-            <div className="cm-mock">
-              <ul className="cm-checks">
-                {[
-                  ["Pilih varian & ukuran", "Tahap 01", 0.24],
-                  ["Konfirmasi stok & ongkir", "Tahap 02", 0.36],
-                  ["Transfer / QRIS & bukti", "Tahap 03", 0.48],
-                  ["Ambil barang & packing SOP", "Tahap 04", 0.6],
-                  ["Kirim paket & pantau resi", "Tahap 05", 0.72],
-                ].map(([label, stepLabel, at]) => (
-                  <li key={stepLabel} className="cm-scrub" style={{ "--a": at }}>
-                    <span className="cm-tick">
-                      <CheckMarkIcon />
-                    </span>
-                    <span>{label}</span>
-                    <small>{stepLabel}</small>
-                  </li>
-                ))}
-              </ul>
             </div>
           </article>
         </div>

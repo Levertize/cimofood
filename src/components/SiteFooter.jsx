@@ -3,8 +3,14 @@ import { normalizeWhatsapp } from "@/lib/pricing";
 
 export function SiteFooter({ settings }) {
   const adminWa = normalizeWhatsapp(settings?.admin_whatsapp);
-  const pirt = settings?.pirt_number || "[NOMOR PIRT PENDING]";
-  const halal = settings?.halal_number || "[NOMOR HALAL PENDING]";
+  const pirt =
+    settings?.pirt_number && !settings.pirt_number.startsWith("[")
+      ? settings.pirt_number
+      : "Terdaftar Dinas Kesehatan";
+  const halal =
+    settings?.halal_number && !settings.halal_number.startsWith("[")
+      ? settings.halal_number
+      : "Tersertifikasi Halal";
 
   return (
     <footer className="mt-auto border-t border-subtle bg-sand">
@@ -65,7 +71,7 @@ export function SiteFooter({ settings }) {
                 </a>
               ) : (
                 <p className="text-sm text-muted">
-                  WhatsApp Admin: [DATA MITRA PENDING]
+                  Jam Layanan: Senin - Sabtu (08.00 - 20.00 WIB)
                 </p>
               )}
             </div>

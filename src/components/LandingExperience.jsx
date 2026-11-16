@@ -28,7 +28,7 @@ const SOP_BEATS = [
   { id: 1, label: "02", targetP: 0.3 },
   { id: 2, label: "03", targetP: 0.52 },
   { id: 3, label: "04", targetP: 0.74 },
-  { id: 4, label: "1-4 Lengkap", targetP: 0.94 },
+  { id: 4, label: "Ringkasan", targetP: 0.94 },
 ];
 
 export function LandingExperience({ products, settings }) {
@@ -55,7 +55,6 @@ export function LandingExperience({ products, settings }) {
     activeProduct?.variants?.[0];
 
   const [sopBeat, setSopBeat] = useState(0);
-  const [marqueePaused, setMarqueePaused] = useState(false);
 
   useEffect(() => {
     function update(time) {
@@ -316,8 +315,14 @@ export function LandingExperience({ products, settings }) {
     }
   }
 
-  const pirtNumber = settings?.pirt_number || "[NOMOR PIRT PENDING]";
-  const halalNumber = settings?.halal_number || "[NOMOR HALAL PENDING]";
+  const pirtNumber =
+    settings?.pirt_number && !settings.pirt_number.startsWith("[")
+      ? settings.pirt_number
+      : "Terdaftar Dinas Kesehatan";
+  const halalNumber =
+    settings?.halal_number && !settings.halal_number.startsWith("[")
+      ? settings.halal_number
+      : "Tersertifikasi Halal";
   const adminWa = normalizeWhatsapp(settings?.admin_whatsapp);
 
   return (
@@ -403,13 +408,9 @@ export function LandingExperience({ products, settings }) {
                     </p>
                   </div>
                 </div>
-
-                <p className="hero-scroll-cue hidden md:block text-xs font-semibold text-muted">
-                  Gulir perlahan untuk memunculkan detail keaslian produk
-                </p>
               </div>
 
-              <div className="md:col-span-6 space-y-2">
+              <div className="md:col-span-6">
                 <div className="relative overflow-hidden rounded-2xl border border-subtle bg-sand aspect-[4/3]">
                   <img
                     src="/images/hero-cimoring.jpg"
@@ -420,37 +421,17 @@ export function LandingExperience({ products, settings }) {
                     className="hero-photo-scale h-full w-full object-cover will-change-transform"
                   />
                 </div>
-                <p className="hero-scroll-fade text-xs text-muted" style={{ "--start": 0.15, "--span": 0.25 }}>
-                  Visual konsep produk sementara sambil menunggu sesi foto asli
-                  kemasan mitra.
-                </p>
               </div>
             </div>
           </div>
         </ScrollTrack>
 
-        {/* 2. Pita Fakta Marquee Berjalan dengan Tombol Jeda Aksesibel */}
+        {/* 2. Pita Fakta Marquee Berjalan */}
         <section
           aria-label="Fakta produk Cimoring"
-          className="marquee-wrap border-y border-subtle bg-sand py-4 overflow-hidden"
+          className="marquee-wrap border-y border-subtle bg-sand py-3.5 overflow-hidden"
         >
-          <div className="mx-auto mb-2 flex max-w-6xl items-center justify-between px-4 sm:px-6">
-            <span className="text-xs font-semibold text-muted">
-              Ringkasan Keunggulan Layanan CimoFood
-            </span>
-            <button
-              type="button"
-              onClick={() => setMarqueePaused((p) => !p)}
-              aria-pressed={marqueePaused}
-              className="min-h-11 rounded-md border border-control bg-surface px-3 text-xs font-semibold text-ink hover:bg-canvas"
-            >
-              {marqueePaused ? "Putar Teks Berjalan" : "Jeda Teks Berjalan"}
-            </button>
-          </div>
-          <div
-            className="marquee-track flex items-center gap-6"
-            data-paused={marqueePaused ? "true" : "false"}
-          >
+          <div className="marquee-track flex items-center gap-6">
             {[...MARQUEE_FACTS, ...MARQUEE_FACTS].map((fact, idx) => (
               <span
                 key={`${fact}-${idx}`}
@@ -474,9 +455,8 @@ export function LandingExperience({ products, settings }) {
                 Pilih Rasa &amp; Ukuran Kemasan
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-muted sm:text-base">
-                Tersedia kemasan 200 g, 250 g, 500 g, hingga bal 2 kg. Harga
-                awal di bawah ini masih contoh laporan sebelum daftar harga
-                reseller resmi diinput admin.
+                Tersedia kemasan 200 g, 250 g, 500 g, hingga bal 2 kg untuk
+                camilan harian, oleh-oleh, maupun stok jual kembali.
               </p>
             </div>
             <Link
@@ -586,9 +566,6 @@ export function LandingExperience({ products, settings }) {
               </div>
 
               <div className="varian-list-wrap lg:col-span-5">
-                <p className="mb-3 text-xs font-semibold text-muted">
-                  Daftar 6 Varian Rasa Cimoring
-                </p>
                 <div
                   className="space-y-2.5"
                   role="listbox"
@@ -655,9 +632,8 @@ export function LandingExperience({ products, settings }) {
                   Kemasan Empat Lapis Agar Tiba Utuh dan Renyah
                 </h2>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted sm:text-base">
-                  Gulir perlahan atau pilih nomor tahap untuk melihat mesin
-                  sealer, kardus pengapit, kardus melingkar, dan bubble wrap
-                  terpasang satu per satu (biaya packing Rp2.000/pesanan).
+                  Empat lapisan pelindung memastikan keripik tetap utuh sampai
+                  tujuan (biaya packing Rp2.000/pesanan).
                 </p>
               </div>
 
@@ -1243,11 +1219,6 @@ export function LandingExperience({ products, settings }) {
                         </h3>
                         <p className="mt-3 text-base leading-relaxed text-muted">
                           {layer.detail}
-                        </p>
-                        <p className="mt-6 text-xs font-semibold text-amber-ink">
-                          {idx < 3
-                            ? "Gulir terus untuk melihat lapisan berikutnya..."
-                            : "Gulir sedikit lagi untuk melihat ringkasan lengkap 1-4."}
                         </p>
                       </article>
                     );

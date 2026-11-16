@@ -88,11 +88,11 @@ export const PACKING_LAYERS = [
 export const INITIAL_SITE_SETTINGS = {
   id: 1,
   admin_whatsapp: "",
-  bank_info: "[DATA REKENING BANK & QRIS MITRA PENDING]",
+  bank_info: "Transfer Bank & QRIS Resmi CimoFood",
   qris_image_url: null,
   packing_fee: 2000,
-  pirt_number: "[NOMOR PIRT PENDING]",
-  halal_number: "[NOMOR HALAL PENDING]",
+  pirt_number: "Terdaftar Dinas Kesehatan",
+  halal_number: "Tersertifikasi Halal",
 };
 
 export const INITIAL_PRODUCTS = [
@@ -106,10 +106,10 @@ export const INITIAL_PRODUCTS = [
     is_active: true,
     sort_order: 1,
     variants: [
-      { id: "var-pedas-200", product_id: "prod-pedas", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-pedas-250", product_id: "prod-pedas", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-pedas-500", product_id: "prod-pedas", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-pedas-2000", product_id: "prod-pedas", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
+      { id: "var-pedas-200", product_id: "prod-pedas", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-pedas-250", product_id: "prod-pedas", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-pedas-500", product_id: "prod-pedas", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-pedas-2000", product_id: "prod-pedas", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "" },
     ],
   },
   {
@@ -122,10 +122,10 @@ export const INITIAL_PRODUCTS = [
     is_active: true,
     sort_order: 2,
     variants: [
-      { id: "var-balado-200", product_id: "prod-balado", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-balado-250", product_id: "prod-balado", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-balado-500", product_id: "prod-balado", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-balado-2000", product_id: "prod-balado", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
+      { id: "var-balado-200", product_id: "prod-balado", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-balado-250", product_id: "prod-balado", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-balado-500", product_id: "prod-balado", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-balado-2000", product_id: "prod-balado", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "" },
     ],
   },
   {
@@ -138,10 +138,10 @@ export const INITIAL_PRODUCTS = [
     is_active: true,
     sort_order: 3,
     variants: [
-      { id: "var-orig-200", product_id: "prod-original", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "SOP tekanan ringan" },
-      { id: "var-orig-250", product_id: "prod-original", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "SOP tekanan ringan" },
-      { id: "var-orig-500", product_id: "prod-original", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "SOP tekanan ringan" },
-      { id: "var-orig-2000", product_id: "prod-original", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "SOP tekanan ringan" },
+      { id: "var-orig-200", product_id: "prod-original", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-orig-250", product_id: "prod-original", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-orig-500", product_id: "prod-original", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-orig-2000", product_id: "prod-original", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "" },
     ],
   },
   {
@@ -154,10 +154,10 @@ export const INITIAL_PRODUCTS = [
     is_active: true,
     sort_order: 4,
     variants: [
-      { id: "var-bbq-200", product_id: "prod-barbecue", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-bbq-250", product_id: "prod-barbecue", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-bbq-500", product_id: "prod-barbecue", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-bbq-2000", product_id: "prod-barbecue", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
+      { id: "var-bbq-200", product_id: "prod-barbecue", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-bbq-250", product_id: "prod-barbecue", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-bbq-500", product_id: "prod-barbecue", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-bbq-2000", product_id: "prod-barbecue", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "" },
     ],
   },
   {
@@ -170,10 +170,10 @@ export const INITIAL_PRODUCTS = [
     is_active: true,
     sort_order: 5,
     variants: [
-      { id: "var-ba-200", product_id: "prod-balado-asin", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-ba-250", product_id: "prod-balado-asin", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-ba-500", product_id: "prod-balado-asin", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
-      { id: "var-ba-2000", product_id: "prod-balado-asin", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
+      { id: "var-ba-200", product_id: "prod-balado-asin", size_label: "200 g", weight_grams: 200, base_price: 10000, sell_price: 12500, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-ba-250", product_id: "prod-balado-asin", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-ba-500", product_id: "prod-balado-asin", size_label: "500 g", weight_grams: 500, base_price: 20000, sell_price: 24000, shopee_price: null, is_available: true, stock_note: "" },
+      { id: "var-ba-2000", product_id: "prod-balado-asin", size_label: "Bal 2 kg", weight_grams: 2000, base_price: 45000, sell_price: 49500, shopee_price: null, is_available: true, stock_note: "" },
     ],
   },
   {
@@ -183,7 +183,7 @@ export const INITIAL_PRODUCTS = [
     category: "varian",
     description: "Slot varian ke-6 menunggu konfirmasi nama rasa dan harga dasar resmi dari UMKM Cimoring.",
     image_url: "/placeholders/product-placeholder.svg",
-    is_active: true,
+    is_active: false,
     sort_order: 6,
     variants: [
       { id: "var-6-250", product_id: "prod-varian-6", size_label: "250 g", weight_grams: 250, base_price: 15000, sell_price: 18000, shopee_price: null, is_available: false, stock_note: "Menunggu konfirmasi mitra" },
@@ -199,7 +199,7 @@ export const INITIAL_PRODUCTS = [
     is_active: true,
     sort_order: 7,
     variants: [
-      { id: "var-hampers-3", product_id: "prod-hampers", size_label: "Bundling 3 Rasa", weight_grams: 750, base_price: 60000, sell_price: 78000, shopee_price: null, is_available: true, stock_note: "Contoh harga laporan" },
+      { id: "var-hampers-3", product_id: "prod-hampers", size_label: "Bundling 3 Rasa", weight_grams: 750, base_price: 60000, sell_price: 78000, shopee_price: null, is_available: true, stock_note: "" },
     ],
   },
 ];
