@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { cleanEnvValue, normalizeSupabaseUrl } from "./config";
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     {
       cookies: {
         getAll() {
@@ -28,8 +29,8 @@ export async function createSupabaseServerClient() {
 
 export function createSupabaseAdminClient() {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY),
     {
       auth: {
         autoRefreshToken: false,

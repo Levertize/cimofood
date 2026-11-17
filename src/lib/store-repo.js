@@ -12,24 +12,23 @@ import {
   createSupabaseAdminClient,
   createSupabaseServerClient,
 } from "./supabase/server";
+import {
+  cleanEnvValue,
+  isRealEnvValue,
+  isSupabaseConfigured,
+} from "./supabase/config";
+
+export { isSupabaseConfigured };
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-data.json");
 const PREVIEW_COOKIE = "cimofood_preview_admin";
 let memoryFallbackDb = null;
 
-export function isSupabaseConfigured() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
-}
-
 export function getAllowedAdminEmails() {
   return String(process.env.ADMIN_EMAILS || "")
     .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
+    .map((item) => cleanEnvValue(item).toLowerCase())
+    .filter((item) => isRealEnvValue(item));
 }
 
 function isAuthorizedAdminUser(user) {
@@ -483,6 +482,16 @@ export async function signInAdmin({ email, password }) {
       "Akun ini belum diizinkan mengakses admin (periksa ADMIN_EMAILS)."
     );
   }
+  if (data.user?.app_metadata?.role !== "admin") {
+    try {
+      const admin = createSupabaseAdminClient();
+      await admin.auth.admin.updateUserById(data.user.id, {
+        app_metadata: { ...(data.user.app_metadata || {}), role: "admin" },
+      });
+    } catch {
+      // Tetap izinkan login via whitelist ADMIN_EMAILS jika sync metadata gagal
+    }
+  }
   return { email: data.user.email, id: data.user.id, isPreviewMode: false };
 }
 
@@ -734,10 +743,11 @@ export async function getBackendReadiness() {
   const supabaseConfigured = isSupabaseConfigured();
   const adminEmails = getAllowedAdminEmails();
   const midtransConfigured = Boolean(
-    process.env.MIDTRANS_SERVER_KEY &&
-      process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY
+    isRealEnvValue(process.env.MIDTRANS_SERVER_KEY) &&
+      isRealEnvValue(process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY)
   );
-  const midtransProduction = process.env.MIDTRANS_IS_PRODUCTION === "true";
+  const midtransProduction =
+    cleanEnvValue(process.env.MIDTRANS_IS_PRODUCTION) === "true";
 
   if (!supabaseConfigured) {
     return {
@@ -768,15 +778,19 @@ export async function getBackendReadiness() {
 
     return {
       supabaseConfigured: true,
-      tablesReady: !prodRes.error,
-      paymentEventsReady: !evtRes.error,
+      tablesReady: !prodRes.error && prodRes.count !== null,
+      paymentEventsReady: !evtRes.error && evtRes.count !== null,
       bucketsReady: !bucketRes.error && missingBuckets.length === 0,
       missingBuckets,
       adminWhitelistConfigured: adminEmails.length > 0,
       adminEmailCount: adminEmails.length,
       midtransConfigured,
       midtransProduction,
-      error: prodRes.error?.message || evtRes.error?.message || bucketRes.error?.message || null,
+      error:
+        prodRes.error?.message ||
+        evtRes.error?.message ||
+        bucketRes.error?.message ||
+        null,
     };
   } catch (err) {
     return {
