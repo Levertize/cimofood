@@ -43,10 +43,10 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-subtle bg-canvas/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-6">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-1.5 px-3 py-3 sm:gap-4 sm:px-6">
         <Link
           href="/"
-          className="inline-flex min-h-11 shrink-0 items-center font-display text-xl font-bold tracking-tight text-ink sm:text-2xl"
+          className="inline-flex min-h-11 shrink-0 items-center font-display text-lg font-bold tracking-tight text-ink sm:text-2xl"
         >
           CimoFood
         </Link>
@@ -82,7 +82,7 @@ export function SiteHeader() {
             type="button"
             onClick={() => setDrawerOpen(true)}
             aria-label={`Buka keranjang belanja, ${totalCount} item`}
-            className="min-h-11 inline-flex items-center gap-1.5 rounded-full border border-control bg-surface px-3 text-xs font-semibold text-ink hover:bg-sand sm:gap-2 sm:px-4 sm:text-sm"
+            className="min-h-11 inline-flex items-center gap-1 rounded-full border border-control bg-surface px-2.5 text-xs font-semibold text-ink hover:bg-sand sm:gap-2 sm:px-4 sm:text-sm"
           >
             <svg
               width="16"
@@ -109,7 +109,7 @@ export function SiteHeader() {
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-nav-panel"
-            className="md:hidden min-h-11 inline-flex items-center gap-1.5 rounded-md border border-control bg-surface px-3 text-xs font-semibold text-ink hover:bg-sand sm:text-sm"
+            className="md:hidden min-h-11 inline-flex items-center gap-1 rounded-md border border-control bg-surface px-2.5 text-xs font-semibold text-ink hover:bg-sand sm:text-sm"
           >
             <span>{mobileMenuOpen ? "Tutup" : "Menu"}</span>
           </button>
