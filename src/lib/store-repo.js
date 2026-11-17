@@ -471,11 +471,34 @@ export async function signInAdmin({ email, password }) {
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: String(email || "").trim(),
+    email: String(email || "").trim().toLowerCase(),
     password: String(password || ""),
   });
 
-  if (error) throw new Error("Email atau kata sandi admin salah.");
+  if (error) {
+    const code = String(error.code || "").toLowerCase();
+    const msg = String(error.message || "").toLowerCase();
+    if (
+      code === "invalid_credentials" ||
+      msg.includes("invalid login credentials")
+    ) {
+      throw new Error("Email atau kata sandi admin salah.");
+    }
+    if (
+      code === "email_not_confirmed" ||
+      msg.includes("email not confirmed")
+    ) {
+      throw new Error(
+        "Email admin belum terkonfirmasi di Supabase Auth. Buka Authentication -> Users di Supabase lalu konfirmasi user Anda."
+      );
+    }
+    if (msg.includes("invalid path") || error.status === 404) {
+      throw new Error(
+        "URL Supabase di .env.local tidak valid (pastikan tanpa akhiran /rest/v1) atau server dev perlu direstart."
+      );
+    }
+    throw new Error(`Gagal login Supabase Auth: ${error.message}`);
+  }
   if (!isAuthorizedAdminUser(data.user)) {
     await supabase.auth.signOut();
     throw new Error(
