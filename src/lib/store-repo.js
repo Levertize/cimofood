@@ -25,6 +25,21 @@ export function isSupabaseConfigured() {
   );
 }
 
+export function getAllowedAdminEmails() {
+  return String(process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isAuthorizedAdminUser(user) {
+  if (!user) return false;
+  if (user.app_metadata?.role === "admin") return true;
+  const allowed = getAllowedAdminEmails();
+  if (allowed.length === 0) return false;
+  return allowed.includes(String(user.email || "").trim().toLowerCase());
+}
+
 async function readLocalDb() {
   try {
     const raw = await fs.readFile(LOCAL_DB_PATH, "utf8");
@@ -87,6 +102,38 @@ export async function getCatalogData() {
   if (prodError) throw new Error(prodError.message);
 
   const { data: variants, error: varError } = await supabase
+    .from("product_variants")
+    .select("*")
+    .order("weight_grams", { ascending: true });
+
+  if (varError) throw new Error(varError.message);
+
+  const enriched = (products || []).map((p) => ({
+    ...p,
+    variants: (variants || []).filter((v) => v.product_id === p.id),
+  }));
+
+  return { products: enriched, isPreviewMode: false };
+}
+
+export async function getAdminCatalogData() {
+  if (!isSupabaseConfigured()) {
+    const db = await readLocalDb();
+    const products = [...db.products].sort(
+      (a, b) => a.sort_order - b.sort_order
+    );
+    return { products, isPreviewMode: true };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: products, error: prodError } = await admin
+    .from("products")
+    .select("*")
+    .order("sort_order", { ascending: true });
+
+  if (prodError) throw new Error(prodError.message);
+
+  const { data: variants, error: varError } = await admin
     .from("product_variants")
     .select("*")
     .order("weight_grams", { ascending: true });
@@ -207,6 +254,14 @@ export async function createOrder(input) {
       total_amount: subtotalSell + packingFee,
       status: "menunggu_konfirmasi",
       payment_proof_url: null,
+      payment_provider: null,
+      payment_order_id: null,
+      payment_snap_token: null,
+      payment_redirect_url: null,
+      payment_method: null,
+      payment_reference: null,
+      payment_fee: 0,
+      paid_at: null,
       tracking_number: null,
       packing_proof_url: null,
       referral_code: referralCode,
@@ -399,7 +454,7 @@ export async function getAuthenticatedAdmin() {
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) return null;
+  if (error || !data?.user || !isAuthorizedAdminUser(data.user)) return null;
   return { email: data.user.email, id: data.user.id, isPreviewMode: false };
 }
 
@@ -422,6 +477,12 @@ export async function signInAdmin({ email, password }) {
   });
 
   if (error) throw new Error("Email atau kata sandi admin salah.");
+  if (!isAuthorizedAdminUser(data.user)) {
+    await supabase.auth.signOut();
+    throw new Error(
+      "Akun ini belum diizinkan mengakses admin (periksa ADMIN_EMAILS)."
+    );
+  }
   return { email: data.user.email, id: data.user.id, isPreviewMode: false };
 }
 
@@ -616,6 +677,121 @@ export async function updateVariant(variantId, payload) {
 
   if (error) throw new Error(error.message);
   return data;
+}
+
+export async function updateProduct(productId, payload) {
+  if (!isSupabaseConfigured()) {
+    const db = await readLocalDb();
+    const idx = db.products.findIndex((p) => p.id === productId);
+    if (idx === -1) throw new Error("Produk tidak ditemukan.");
+
+    const cur = db.products[idx];
+    db.products[idx] = {
+      ...cur,
+      is_active:
+        payload.is_active !== undefined
+          ? Boolean(payload.is_active)
+          : cur.is_active,
+      name:
+        payload.name !== undefined
+          ? String(payload.name || "").trim() || cur.name
+          : cur.name,
+      description:
+        payload.description !== undefined
+          ? String(payload.description || "").trim()
+          : cur.description,
+    };
+    await writeLocalDb(db);
+    return db.products[idx];
+  }
+
+  const admin = createSupabaseAdminClient();
+  const updates = {};
+  if (payload.is_active !== undefined)
+    updates.is_active = Boolean(payload.is_active);
+  if (payload.name !== undefined) {
+    const cleanName = String(payload.name || "").trim();
+    if (!cleanName) throw new Error("Nama produk tidak boleh kosong.");
+    updates.name = cleanName;
+  }
+  if (payload.description !== undefined) {
+    updates.description = String(payload.description || "").trim();
+  }
+
+  const { data, error } = await admin
+    .from("products")
+    .update(updates)
+    .eq("id", productId)
+    .select("*, product_variants(*)")
+    .single();
+
+  if (error) throw new Error(error.message);
+  const { product_variants, ...rest } = data;
+  return { ...rest, variants: product_variants || [] };
+}
+
+export async function getBackendReadiness() {
+  const supabaseConfigured = isSupabaseConfigured();
+  const adminEmails = getAllowedAdminEmails();
+  const midtransConfigured = Boolean(
+    process.env.MIDTRANS_SERVER_KEY &&
+      process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY
+  );
+  const midtransProduction = process.env.MIDTRANS_IS_PRODUCTION === "true";
+
+  if (!supabaseConfigured) {
+    return {
+      supabaseConfigured: false,
+      tablesReady: false,
+      paymentEventsReady: false,
+      bucketsReady: false,
+      missingBuckets: ["product-images", "payment-proofs"],
+      adminWhitelistConfigured: adminEmails.length > 0,
+      adminEmailCount: adminEmails.length,
+      midtransConfigured,
+      midtransProduction,
+      error: null,
+    };
+  }
+
+  try {
+    const admin = createSupabaseAdminClient();
+    const [prodRes, evtRes, bucketRes] = await Promise.all([
+      admin.from("products").select("id", { count: "exact", head: true }),
+      admin.from("payment_events").select("id", { count: "exact", head: true }),
+      admin.storage.listBuckets(),
+    ]);
+
+    const bucketNames = new Set((bucketRes.data || []).map((b) => b.name));
+    const requiredBuckets = ["product-images", "payment-proofs"];
+    const missingBuckets = requiredBuckets.filter((b) => !bucketNames.has(b));
+
+    return {
+      supabaseConfigured: true,
+      tablesReady: !prodRes.error,
+      paymentEventsReady: !evtRes.error,
+      bucketsReady: !bucketRes.error && missingBuckets.length === 0,
+      missingBuckets,
+      adminWhitelistConfigured: adminEmails.length > 0,
+      adminEmailCount: adminEmails.length,
+      midtransConfigured,
+      midtransProduction,
+      error: prodRes.error?.message || evtRes.error?.message || bucketRes.error?.message || null,
+    };
+  } catch (err) {
+    return {
+      supabaseConfigured: true,
+      tablesReady: false,
+      paymentEventsReady: false,
+      bucketsReady: false,
+      missingBuckets: ["product-images", "payment-proofs"],
+      adminWhitelistConfigured: adminEmails.length > 0,
+      adminEmailCount: adminEmails.length,
+      midtransConfigured,
+      midtransProduction,
+      error: err.message,
+    };
+  }
 }
 
 export async function updateSiteSettings(payload) {

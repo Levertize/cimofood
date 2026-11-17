@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import {
+  getAdminCatalogData,
   getAuthenticatedAdmin,
-  getCatalogData,
+  updateProduct,
   updateVariant,
 } from "@/lib/store-repo";
 
@@ -11,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: "Akses ditolak." }, { status: 401 });
   }
   try {
-    const data = await getCatalogData();
+    const data = await getAdminCatalogData();
     return NextResponse.json(data);
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -25,9 +26,13 @@ export async function PATCH(request) {
   }
   try {
     const body = await request.json();
+    if (body.productId) {
+      const product = await updateProduct(body.productId, body);
+      return NextResponse.json({ product });
+    }
     if (!body.variantId) {
       return NextResponse.json(
-        { error: "ID varian wajib disertakan." },
+        { error: "ID produk atau ID varian wajib disertakan." },
         { status: 400 }
       );
     }

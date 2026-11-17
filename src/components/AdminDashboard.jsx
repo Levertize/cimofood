@@ -23,6 +23,7 @@ export function AdminDashboard({
   initialOrders,
   initialProducts,
   initialSettings,
+  backendStatus,
   adminEmail,
   isPreviewMode,
 }) {
@@ -164,6 +165,39 @@ export function AdminDashboard({
         }))
       );
       setFeedback(`Harga varian ${variant.size_label} diperbarui.`);
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setSavingVariantId("");
+    }
+  }
+
+  async function handleToggleProductActive(product) {
+    setSavingVariantId(product.id);
+    setErrorMsg("");
+    setFeedback("");
+    try {
+      const res = await fetch("/api/admin/variants", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          is_active: !product.is_active,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengubah status produk.");
+
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === product.id ? { ...p, is_active: data.product.is_active } : p
+        )
+      );
+      setFeedback(
+        `${product.name} kini ${
+          data.product.is_active ? "tampil di toko" : "disembunyikan (draft)"
+        }.`
+      );
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -456,9 +490,32 @@ export function AdminDashboard({
                   key={product.id}
                   className="rounded-2xl border border-subtle bg-surface p-5"
                 >
-                  <h2 className="font-display text-xl font-bold text-ink">
-                    {product.name}
-                  </h2>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h2 className="font-display text-xl font-bold text-ink">
+                        {product.name}
+                      </h2>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          product.is_active
+                            ? "bg-forest text-white"
+                            : "border border-control bg-sand text-muted"
+                        }`}
+                      >
+                        {product.is_active ? "Tampil di Toko" : "Draft"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={savingVariantId === product.id}
+                      onClick={() => handleToggleProductActive(product)}
+                      className="min-h-11 rounded-full border border-control bg-canvas px-4 text-xs font-semibold text-ink hover:bg-sand disabled:opacity-60"
+                    >
+                      {product.is_active
+                        ? "Sembunyikan dari Toko"
+                        : "Tampilkan di Toko"}
+                    </button>
+                  </div>
 
                   <div className="mt-4 overflow-x-auto">
                     <table className="w-full min-w-[720px] text-left text-sm">
@@ -830,6 +887,95 @@ export function AdminDashboard({
                   {savingSettings ? "Menyimpan..." : "Simpan Pengaturan Toko"}
                 </button>
               </form>
+
+              {backendStatus && (
+                <div className="mt-6 border-t border-subtle pt-5 space-y-2.5">
+                  <h3 className="text-sm font-semibold text-ink">
+                    Status Integrasi Backend
+                  </h3>
+                  <dl className="space-y-2 rounded-xl border border-subtle bg-canvas p-3.5 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <dt className="text-muted">Koneksi Supabase Env</dt>
+                      <dd
+                        className={`font-semibold ${
+                          backendStatus.supabaseConfigured
+                            ? "text-forest"
+                            : "text-amber-ink"
+                        }`}
+                      >
+                        {backendStatus.supabaseConfigured
+                          ? "Tersambung"
+                          : "Mode Preview Lokal"}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <dt className="text-muted">Tabel DB &amp; payment_events</dt>
+                      <dd
+                        className={`font-semibold ${
+                          backendStatus.tablesReady &&
+                          backendStatus.paymentEventsReady
+                            ? "text-forest"
+                            : "text-muted"
+                        }`}
+                      >
+                        {backendStatus.tablesReady &&
+                        backendStatus.paymentEventsReady
+                          ? "Siap"
+                          : "Menunggu SQL Run"}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <dt className="text-muted">Storage Buckets</dt>
+                      <dd
+                        className={`font-semibold ${
+                          backendStatus.bucketsReady
+                            ? "text-forest"
+                            : "text-muted"
+                        }`}
+                      >
+                        {backendStatus.bucketsReady
+                          ? "Aktif (2 Bucket)"
+                          : `Belum (${backendStatus.missingBuckets.join(", ")})`}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <dt className="text-muted">Whitelist ADMIN_EMAILS</dt>
+                      <dd
+                        className={`font-semibold ${
+                          backendStatus.adminWhitelistConfigured
+                            ? "text-forest"
+                            : "text-amber-ink"
+                        }`}
+                      >
+                        {backendStatus.adminWhitelistConfigured
+                          ? `Aktif (${backendStatus.adminEmailCount} email)`
+                          : "Belum diisi"}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <dt className="text-muted">Midtrans Snap Env</dt>
+                      <dd
+                        className={`font-semibold ${
+                          backendStatus.midtransConfigured
+                            ? "text-forest"
+                            : "text-muted"
+                        }`}
+                      >
+                        {backendStatus.midtransConfigured
+                          ? backendStatus.midtransProduction
+                            ? "Live"
+                            : "Sandbox Siap"
+                          : "Belum dikonfigurasi"}
+                      </dd>
+                    </div>
+                  </dl>
+                  {backendStatus.error && (
+                    <p className="text-xs text-chili-hover">
+                      Info DB: {backendStatus.error}
+                    </p>
+                  )}
+                </div>
+              )}
             </section>
           </div>
         )}
@@ -838,7 +984,7 @@ export function AdminDashboard({
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div
-            className="fixed inset-0 bg-ink/50"
+            className="fixed inset-0 bg-[#121110]/60 backdrop-blur-[1px]"
             onClick={() => setSelectedOrder(null)}
             aria-hidden="true"
           />

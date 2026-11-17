@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import {
+  getAdminCatalogData,
   getAuthenticatedAdmin,
-  getCatalogData,
+  getBackendReadiness,
   getSiteSettings,
   listAdminOrders,
 } from "@/lib/store-repo";
@@ -19,10 +20,11 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const [orders, { products }, { settings }] = await Promise.all([
+  const [orders, { products }, { settings }, backendStatus] = await Promise.all([
     listAdminOrders(),
-    getCatalogData(),
+    getAdminCatalogData(),
     getSiteSettings(),
+    getBackendReadiness(),
   ]);
 
   return (
@@ -30,6 +32,7 @@ export default async function AdminPage() {
       initialOrders={orders}
       initialProducts={products}
       initialSettings={settings}
+      backendStatus={backendStatus}
       adminEmail={admin.email}
       isPreviewMode={admin.isPreviewMode}
     />

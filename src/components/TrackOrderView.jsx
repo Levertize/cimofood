@@ -300,7 +300,7 @@ export function TrackOrderView({
                 </p>
                 <p className="mt-1 whitespace-pre-line text-muted">
                   {paymentInfo?.bank_info ||
-                    "[DATA REKENING BANK & QRIS MITRA PENDING]"}
+                    "Hubungi admin via WhatsApp untuk informasi rekening atau QRIS."}
                 </p>
               </div>
 
