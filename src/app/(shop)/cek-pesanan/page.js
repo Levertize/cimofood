@@ -1,12 +1,13 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TrackOrderView } from "@/components/TrackOrderView";
+import { getPublicMidtransConfig } from "@/lib/midtrans";
 import { getSiteSettings, trackOrder } from "@/lib/store-repo";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Cek Pesanan & Upload Bukti | CimoFood",
+  title: "Cek Pesanan & Pembayaran | CimoFood",
 };
 
 export default async function CekPesananPage({ searchParams }) {
@@ -14,6 +15,8 @@ export default async function CekPesananPage({ searchParams }) {
   const code = sp?.code ? String(sp.code) : "";
   const wa = sp?.wa ? String(sp.wa) : "";
   const method = sp?.method ? String(sp.method) : "midtrans_auto";
+  const paymentReturn = sp?.payment ? String(sp.payment) : "";
+  const midtransConfig = getPublicMidtransConfig();
 
   const { settings } = await getSiteSettings();
 
@@ -29,6 +32,7 @@ export default async function CekPesananPage({ searchParams }) {
           qris_image_url: data.settings.qris_image_url,
           admin_whatsapp: data.settings.admin_whatsapp,
         },
+        midtransConfig,
       };
     } catch (err) {
       initialError = err.message;
@@ -43,6 +47,8 @@ export default async function CekPesananPage({ searchParams }) {
           initialCode={code}
           initialWa={wa}
           initialMethod={method}
+          initialPaymentReturn={paymentReturn}
+          midtransConfig={midtransConfig}
           initialResult={initialResult}
           initialError={initialError}
         />

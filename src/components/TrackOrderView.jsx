@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getOrderFlowStepIndex,
   ORDER_FLOW_STEPS,
@@ -14,10 +14,56 @@ import {
   useRecentOrders,
 } from "@/lib/recent-orders";
 
+function ensureMidtransSnapScript(scriptUrl, clientKey) {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Browser tidak tersedia."));
+  }
+  if (window.snap?.pay) {
+    return Promise.resolve(window.snap);
+  }
+  return new Promise((resolve, reject) => {
+    const existing = document.getElementById("midtrans-snap-script");
+    if (existing) {
+      if (existing.getAttribute("data-loaded") === "1" && window.snap?.pay) {
+        resolve(window.snap);
+        return;
+      }
+      existing.addEventListener("load", () =>
+        window.snap?.pay
+          ? resolve(window.snap)
+          : reject(new Error("Midtrans Snap gagal dimuat."))
+      );
+      existing.addEventListener("error", () =>
+        reject(new Error("Gagal memuat skrip Midtrans Snap."))
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "midtrans-snap-script";
+    script.src = scriptUrl;
+    script.setAttribute("data-client-key", clientKey);
+    script.async = true;
+    script.onload = () => {
+      script.setAttribute("data-loaded", "1");
+      if (window.snap?.pay) {
+        resolve(window.snap);
+      } else {
+        reject(new Error("Midtrans Snap tidak siap setelah skrip dimuat."));
+      }
+    };
+    script.onerror = () =>
+      reject(new Error("Gagal mengunduh skrip pembayaran Midtrans."));
+    document.body.appendChild(script);
+  });
+}
+
 export function TrackOrderView({
   initialCode = "",
   initialWa = "",
   initialMethod = "midtrans_auto",
+  initialPaymentReturn = "",
+  midtransConfig = { enabled: false, clientKey: "", snapScriptUrl: "" },
   initialResult = null,
   initialError = "",
 }) {
@@ -41,12 +87,18 @@ export function TrackOrderView({
   const [uploadMsg, setUploadMsg] = useState("");
   const [uploadErr, setUploadErr] = useState("");
 
+  const [snapLoading, setSnapLoading] = useState(false);
+  const [syncingPayment, setSyncingPayment] = useState(false);
+  const [snapMsg, setSnapMsg] = useState("");
+  const [snapErr, setSnapErr] = useState("");
+
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
   const [receiptMsg, setReceiptMsg] = useState("");
   const [receiptErr, setReceiptErr] = useState("");
 
   const proofInputRef = useRef(null);
   const syncedListRef = useRef(false);
+  const returnSyncedRef = useRef(false);
 
   useEffect(() => {
     if (initialResult?.order) {
@@ -60,10 +112,130 @@ export function TrackOrderView({
     syncRecentOrderStatuses(recentOrders);
   }, [recentOrders]);
 
+  const syncPaymentStatus = useCallback(async (targetOrder) => {
+    if (!targetOrder?.order_code || !targetOrder?.customer_whatsapp) return;
+    setSyncingPayment(true);
+    setSnapErr("");
+    try {
+      const res = await fetch("/api/payments/midtrans/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderCode: targetOrder.order_code,
+          whatsapp: targetOrder.customer_whatsapp,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal memeriksa status Midtrans.");
+      }
+      if (data.order) {
+        setResult((prev) => ({ ...prev, order: data.order }));
+        upsertRecentOrder(data.order, "midtrans_auto");
+      }
+      if (data.paid) {
+        setSnapMsg(
+          "Pembayaran via Midtrans berhasil dikonfirmasi! Pesanan Anda kini berstatus Sedang Dikemas."
+        );
+      } else if (data.transactionStatus === "pending") {
+        setSnapMsg(
+          "Pembayaran tercatat menunggu pelunasan (QRIS/VA Midtrans). Setelah Anda membayar, klik Cek Status Pembayaran."
+        );
+      } else if (
+        ["expire", "cancel", "deny"].includes(data.transactionStatus)
+      ) {
+        setSnapErr(
+          `Sesi pembayaran Midtrans sebelumnya (${data.transactionStatus}). Klik Bayar Sekarang via Midtrans untuk mencoba lagi.`
+        );
+      }
+    } catch (err) {
+      setSnapErr(err.message);
+    } finally {
+      setSyncingPayment(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      returnSyncedRef.current ||
+      initialPaymentReturn !== "finish" ||
+      !initialResult?.order?.payment_order_id ||
+      ["dikemas", "dikirim", "selesai", "dibatalkan"].includes(
+        initialResult.order.status
+      )
+    ) {
+      return;
+    }
+    returnSyncedRef.current = true;
+    syncPaymentStatus(initialResult.order);
+  }, [initialPaymentReturn, initialResult, syncPaymentStatus]);
+
+  async function handlePayWithMidtrans(forceNew = false) {
+    if (!order || snapLoading) return;
+    setSnapErr("");
+    setSnapMsg("");
+    setSnapLoading(true);
+    try {
+      const res = await fetch("/api/payments/midtrans/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderCode: order.order_code,
+          whatsapp: order.customer_whatsapp,
+          forceNew,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal memulai pembayaran Midtrans.");
+      }
+
+      if (data.order) {
+        setResult((prev) => ({ ...prev, order: data.order }));
+        upsertRecentOrder(data.order, "midtrans_auto");
+      }
+
+      if (data.alreadyPaid) {
+        setSnapMsg(
+          "Pembayaran Anda sudah terkonfirmasi lunas dan masuk tahap Sedang Dikemas."
+        );
+        return;
+      }
+
+      const scriptUrl = data.snapScriptUrl || activeMidtrans?.snapScriptUrl;
+      const clientKey = data.clientKey || activeMidtrans?.clientKey;
+      const snap = await ensureMidtransSnapScript(scriptUrl, clientKey);
+
+      snap.pay(data.token, {
+        language: "id",
+        onSuccess: () => {
+          syncPaymentStatus(data.order || order);
+        },
+        onPending: () => {
+          syncPaymentStatus(data.order || order);
+        },
+        onError: () => {
+          setSnapErr(
+            "Pembayaran tidak berhasil atau dibatalkan di Midtrans. Anda dapat mencoba ulang atau memakai metode lain."
+          );
+        },
+        onClose: () => {
+          syncPaymentStatus(data.order || order);
+        },
+      });
+    } catch (err) {
+      setSnapErr(err.message);
+    } finally {
+      setSnapLoading(false);
+    }
+  }
+
   async function fetchAndSelectOrder(orderCode, orderWa) {
     setError("");
     setUploadMsg("");
     setUploadErr("");
+    setSnapMsg("");
+    setSnapErr("");
     setReceiptMsg("");
     setReceiptErr("");
     setLoading(true);
@@ -166,6 +338,7 @@ export function TrackOrderView({
 
   const order = result?.order;
   const paymentInfo = result?.paymentInfo;
+  const activeMidtrans = result?.midtransConfig || midtransConfig;
   const statusMeta = order
     ? ORDER_STATUS_META[order.status] || {
         label: order.status,
@@ -427,6 +600,22 @@ export function TrackOrderView({
               </div>
             )}
 
+            {order.paid_at && (
+              <div className="rounded-xl border border-forest bg-sand p-4 text-sm space-y-1">
+                <p className="text-xs font-semibold text-forest">
+                  Pembayaran Terkonfirmasi Lunas
+                </p>
+                <p className="font-semibold text-ink">
+                  Metode: {order.payment_method || "Midtrans"}
+                  {order.payment_reference ? ` (${order.payment_reference})` : ""}
+                </p>
+                <p className="text-xs text-muted tabular-nums">
+                  Lunas pada:{" "}
+                  {new Date(order.paid_at).toLocaleString("id-ID")}
+                </p>
+              </div>
+            )}
+
             {order.tracking_number && (
               <div className="rounded-xl border border-forest bg-sand p-4">
                 <p className="text-xs font-semibold text-forest">
@@ -635,21 +824,93 @@ export function TrackOrderView({
                     </span>
                   </div>
 
-                  <div className="rounded-lg border border-subtle bg-surface p-3.5 text-xs leading-relaxed text-muted">
-                    Aktivasi tombol <strong>Bayar Otomatis Midtrans Snap</strong>{" "}
-                    &amp; verifikasi webhook otomatis akan dihubungkan pada{" "}
-                    <strong>Tahap 3B (Integrasi Backend Midtrans)</strong>. Saat
-                    ini Anda dapat langsung melakukan pelunasan lewat tab{" "}
-                    <strong>Transfer Bank / QRIS Toko (Manual)</strong>.
-                  </div>
+                  {snapMsg && (
+                    <div
+                      role="status"
+                      className="rounded-lg border border-forest bg-surface p-3.5 text-xs font-medium text-forest"
+                    >
+                      {snapMsg}
+                    </div>
+                  )}
+                  {snapErr && (
+                    <div
+                      role="alert"
+                      className="rounded-lg border border-chili bg-surface p-3.5 text-xs font-medium text-chili-hover"
+                    >
+                      {snapErr}
+                    </div>
+                  )}
 
-                  <button
-                    type="button"
-                    onClick={() => setPaymentTab("manual_transfer")}
-                    className="min-h-11 rounded-full bg-chili px-6 py-2.5 text-sm font-semibold text-white hover:bg-chili-hover"
-                  >
-                    Bayar via QRIS / Transfer Bank Sekarang
-                  </button>
+                  {activeMidtrans?.enabled ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => handlePayWithMidtrans(false)}
+                          disabled={snapLoading}
+                          className="min-h-11 rounded-full bg-chili px-6 py-2.5 text-sm font-semibold text-white hover:bg-chili-hover disabled:opacity-60"
+                        >
+                          {snapLoading
+                            ? "Membuka Midtrans..."
+                            : "Bayar Sekarang via Midtrans"}
+                        </button>
+
+                        {order.payment_order_id && (
+                          <button
+                            type="button"
+                            onClick={() => syncPaymentStatus(order)}
+                            disabled={syncingPayment}
+                            className="min-h-11 rounded-full border border-control bg-surface px-4 text-xs font-semibold text-ink hover:border-ink disabled:opacity-60"
+                          >
+                            {syncingPayment
+                              ? "Mengecek Status..."
+                              : "Cek Status Pembayaran"}
+                          </button>
+                        )}
+                      </div>
+
+                      {order.payment_redirect_url && (
+                        <div className="flex flex-wrap items-center gap-4 text-xs">
+                          <a
+                            href={order.payment_redirect_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-semibold text-forest underline-offset-2 hover:underline"
+                          >
+                            Popup tidak muncul? Buka Halaman Bayar Midtrans
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handlePayWithMidtrans(true)}
+                            disabled={snapLoading}
+                            className="font-semibold text-muted underline-offset-2 hover:text-ink hover:underline"
+                          >
+                            Ganti Metode / Buat Sesi Baru
+                          </button>
+                        </div>
+                      )}
+
+                      <p className="text-xs leading-relaxed text-muted">
+                        Setelah menyelesaikan QRIS / Virtual Account di popup
+                        Midtrans, status pesanan otomatis berpindah ke{" "}
+                        <strong>Sedang Dikemas</strong>.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-subtle bg-surface p-3.5 text-xs leading-relaxed text-muted">
+                        Pembayaran otomatis Midtrans belum diaktifkan di server.
+                        Gunakan transfer bank / QRIS manual toko di sebelah.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentTab("manual_transfer")}
+                        className="min-h-11 rounded-full bg-chili px-6 py-2.5 text-sm font-semibold text-white hover:bg-chili-hover"
+                      >
+                        Bayar via QRIS / Transfer Bank Sekarang
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">

@@ -1266,8 +1266,33 @@ export function AdminDashboard({
 
             <div>
               <h3 className="text-sm font-semibold text-ink">
-                Bukti Pembayaran Pembeli
+                Status &amp; Bukti Pembayaran Pembeli
               </h3>
+              {(selectedOrder.payment_provider === "midtrans" ||
+                selectedOrder.paid_at) && (
+                <div className="mt-2 rounded-xl border border-forest bg-sand p-3 text-xs space-y-1">
+                  <p className="font-semibold text-forest">
+                    Gateway: {selectedOrder.payment_provider || "Midtrans"}
+                    {selectedOrder.paid_at ? " (Terverifikasi Lunas)" : ""}
+                  </p>
+                  {selectedOrder.payment_method && (
+                    <p className="text-ink">
+                      Metode: {selectedOrder.payment_method}
+                    </p>
+                  )}
+                  {selectedOrder.payment_reference && (
+                    <p className="text-muted tabular-nums">
+                      Referensi: {selectedOrder.payment_reference}
+                    </p>
+                  )}
+                  {selectedOrder.paid_at && (
+                    <p className="text-muted tabular-nums">
+                      Waktu Lunas:{" "}
+                      {new Date(selectedOrder.paid_at).toLocaleString("id-ID")}
+                    </p>
+                  )}
+                </div>
+              )}
               {selectedOrder.payment_proof_signed_url ? (
                 <div className="mt-2 overflow-hidden rounded-xl border border-subtle bg-canvas p-2">
                   <img
@@ -1276,11 +1301,11 @@ export function AdminDashboard({
                     className="max-h-64 w-full rounded-lg object-contain"
                   />
                 </div>
-              ) : (
+              ) : !selectedOrder.paid_at ? (
                 <p className="mt-1 text-sm text-muted">
-                  Pembeli belum mengunggah bukti transfer/QRIS.
+                  Pembeli belum melunasi atau mengunggah bukti transfer/QRIS.
                 </p>
-              )}
+              ) : null}
             </div>
 
             <div className="space-y-2.5 border-t border-subtle pt-4">

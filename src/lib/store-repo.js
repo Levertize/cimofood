@@ -23,6 +23,16 @@ import {
   uploadImageToBucket,
   validateImageUpload,
 } from "./media-storage";
+import {
+  createMidtransSnapTransaction,
+  extractMidtransReference,
+  fetchMidtransTransactionStatus,
+  formatMidtransPaymentMethod,
+  getMidtransConfig,
+  isMidtransClosedAttemptStatus,
+  isMidtransPaidStatus,
+  verifyMidtransSignature,
+} from "./midtrans";
 
 export { isSupabaseConfigured };
 
@@ -654,6 +664,8 @@ export async function updateAdminOrder(orderId, payload) {
       Number(current.subtotal_sell) +
       Number(current.packing_fee) +
       Number(shippingCost);
+    const shippingChanged =
+      Number(shippingCost) !== Number(current.shipping_cost);
 
     db.orders[idx] = {
       ...current,
@@ -662,6 +674,13 @@ export async function updateAdminOrder(orderId, payload) {
       status: nextStatus || current.status,
       tracking_number:
         nextTracking !== undefined ? nextTracking : current.tracking_number,
+      ...(shippingChanged && !current.paid_at
+        ? {
+            payment_order_id: null,
+            payment_snap_token: null,
+            payment_redirect_url: null,
+          }
+        : {}),
       updated_at: new Date().toISOString(),
     };
     await writeLocalDb(db);
@@ -683,17 +702,26 @@ export async function updateAdminOrder(orderId, payload) {
     Number(current.subtotal_sell) +
     Number(current.packing_fee) +
     Number(shippingCost);
+  const shippingChanged =
+    Number(shippingCost) !== Number(current.shipping_cost);
+
+  const updateFields = {
+    shipping_cost: shippingCost,
+    total_amount: totalAmount,
+    status: nextStatus || current.status,
+    tracking_number:
+      nextTracking !== undefined ? nextTracking : current.tracking_number,
+    updated_at: new Date().toISOString(),
+  };
+  if (shippingChanged && !current.paid_at) {
+    updateFields.payment_order_id = null;
+    updateFields.payment_snap_token = null;
+    updateFields.payment_redirect_url = null;
+  }
 
   const { data: updated, error: updateErr } = await admin
     .from("orders")
-    .update({
-      shipping_cost: shippingCost,
-      total_amount: totalAmount,
-      status: nextStatus || current.status,
-      tracking_number:
-        nextTracking !== undefined ? nextTracking : current.tracking_number,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateFields)
     .eq("id", orderId)
     .select("*, order_items(*)")
     .single();
@@ -1138,4 +1166,358 @@ export async function clearPackingProof(orderId) {
     existing.packing_proof_url
   );
   return { order: await enrichOrderWithMedia(admin, updated) };
+}
+
+const PRE_PAID_ORDER_STATUSES = [
+  "menunggu_konfirmasi",
+  "menunggu_pembayaran",
+  "verifikasi_bayar",
+  "dibayar",
+];
+
+async function recordMidtransEventSafely(admin, orderId, payload) {
+  const gatewayOrderId = String(payload?.order_id || "");
+  const txStatus = String(payload?.transaction_status || "unknown");
+  const txId = payload?.transaction_id ? String(payload.transaction_id) : null;
+  if (!admin || !gatewayOrderId) return;
+
+  try {
+    let query = admin
+      .from("payment_events")
+      .select("id", { count: "exact", head: true })
+      .eq("gateway_order_id", gatewayOrderId)
+      .eq("transaction_status", txStatus);
+    if (txId) {
+      query = query.eq("transaction_id", txId);
+    }
+    const { count } = await query;
+    if (count && count > 0) return;
+
+    await admin.from("payment_events").insert({
+      order_id: orderId,
+      provider: "midtrans",
+      gateway_order_id: gatewayOrderId,
+      transaction_id: txId,
+      transaction_status: txStatus,
+      payment_type: payload?.payment_type ? String(payload.payment_type) : null,
+      gross_amount: Math.max(0, Math.round(Number(payload?.gross_amount || 0))),
+      payload: payload || {},
+    });
+  } catch {
+    // Jangan gagalkan update status order utama bila pencatatan event log bermasalah
+  }
+}
+
+async function applyMidtransNotificationToOrder({ admin, order, payload }) {
+  const txStatus = String(payload?.transaction_status || "").toLowerCase();
+  const isPaid = isMidtransPaidStatus(payload);
+  const isClosedAttempt = isMidtransClosedAttemptStatus(txStatus);
+  const paidAmount = Math.round(Number(payload?.gross_amount || 0));
+
+  if (
+    isPaid &&
+    paidAmount > 0 &&
+    paidAmount !== Math.round(Number(order.total_amount || 0))
+  ) {
+    throw new Error(
+      `Nominal pembayaran Midtrans (${paidAmount}) tidak cocok dengan tagihan order (${order.total_amount}).`
+    );
+  }
+
+  const nextPaymentMethod =
+    formatMidtransPaymentMethod(payload) || order.payment_method || null;
+  const nextPaymentReference =
+    extractMidtransReference(payload) || order.payment_reference || null;
+
+  const updates = {
+    payment_provider: "midtrans",
+    payment_method: nextPaymentMethod,
+    payment_reference: nextPaymentReference,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (isPaid) {
+    if (PRE_PAID_ORDER_STATUSES.includes(order.status)) {
+      updates.status = "dikemas";
+    }
+    updates.paid_at = order.paid_at || new Date().toISOString();
+  } else if (isClosedAttempt && !order.paid_at) {
+    updates.payment_snap_token = null;
+    updates.payment_redirect_url = null;
+  }
+
+  if (!admin) {
+    const db = await readLocalDb();
+    const idx = db.orders.findIndex((o) => o.id === order.id);
+    if (idx === -1) throw new Error("Pesanan tidak ditemukan.");
+    db.orders[idx] = { ...db.orders[idx], ...updates };
+    await writeLocalDb(db);
+    return {
+      order: await enrichOrderWithMedia(null, db.orders[idx]),
+      paid: isPaid,
+      transactionStatus: txStatus,
+    };
+  }
+
+  const { data: updated, error: updateErr } = await admin
+    .from("orders")
+    .update(updates)
+    .eq("id", order.id)
+    .select("*, order_items(*)")
+    .single();
+
+  if (updateErr) throw new Error(updateErr.message);
+  await recordMidtransEventSafely(admin, order.id, payload);
+
+  return {
+    order: await enrichOrderWithMedia(admin, updated),
+    paid: isPaid,
+    transactionStatus: txStatus,
+  };
+}
+
+/**
+ * Creates or reuses a Midtrans Snap token for an order ready for payment.
+ */
+export async function createMidtransPaymentSession({
+  orderCode,
+  whatsapp,
+  originUrl = "",
+  forceNew = false,
+}) {
+  const cfg = getMidtransConfig();
+  if (!cfg.configured) {
+    throw new Error(
+      "Kunci Midtrans belum dikonfigurasi pada environment variables."
+    );
+  }
+
+  const { order } = await trackOrder(orderCode, whatsapp);
+  if (order.status === "menunggu_konfirmasi") {
+    throw new Error(
+      "Admin belum mengonfirmasi stok dan ongkos kirim. Tunggu ongkir terisi sebelum membayar."
+    );
+  }
+  if (order.status === "dibatalkan") {
+    throw new Error("Pesanan ini sudah dibatalkan.");
+  }
+  if (["dibayar", "dikemas", "dikirim", "selesai"].includes(order.status)) {
+    return {
+      alreadyPaid: true,
+      order,
+      clientKey: cfg.clientKey,
+      snapScriptUrl: cfg.snapScriptUrl,
+    };
+  }
+  if (Number(order.total_amount || 0) <= 0) {
+    throw new Error("Total tagihan pesanan belum valid.");
+  }
+
+  const admin = isSupabaseConfigured() ? createSupabaseAdminClient() : null;
+
+  if (order.payment_order_id && order.payment_snap_token && !forceNew) {
+    const existingStatus = await fetchMidtransTransactionStatus(
+      order.payment_order_id
+    );
+    if (existingStatus) {
+      if (isMidtransPaidStatus(existingStatus)) {
+        const reconciled = await applyMidtransNotificationToOrder({
+          admin,
+          order,
+          payload: existingStatus,
+        });
+        return {
+          alreadyPaid: true,
+          order: reconciled.order,
+          clientKey: cfg.clientKey,
+          snapScriptUrl: cfg.snapScriptUrl,
+        };
+      }
+      const sameAmount =
+        Math.round(Number(existingStatus.gross_amount || 0)) ===
+        Math.round(Number(order.total_amount || 0));
+      if (
+        sameAmount &&
+        !isMidtransClosedAttemptStatus(existingStatus.transaction_status)
+      ) {
+        return {
+          alreadyPaid: false,
+          token: order.payment_snap_token,
+          redirectUrl: order.payment_redirect_url,
+          gatewayOrderId: order.payment_order_id,
+          clientKey: cfg.clientKey,
+          snapScriptUrl: cfg.snapScriptUrl,
+          order,
+        };
+      }
+    } else {
+      return {
+        alreadyPaid: false,
+        token: order.payment_snap_token,
+        redirectUrl: order.payment_redirect_url,
+        gatewayOrderId: order.payment_order_id,
+        clientKey: cfg.clientKey,
+        snapScriptUrl: cfg.snapScriptUrl,
+        order,
+      };
+    }
+  }
+
+  const gatewayOrderId = `${order.order_code}-M${Date.now()
+    .toString()
+    .slice(-6)}`;
+  const { token, redirectUrl } = await createMidtransSnapTransaction({
+    order,
+    gatewayOrderId,
+    originUrl,
+  });
+
+  if (!admin) {
+    const db = await readLocalDb();
+    const idx = db.orders.findIndex((o) => o.id === order.id);
+    if (idx !== -1) {
+      db.orders[idx] = {
+        ...db.orders[idx],
+        payment_provider: "midtrans",
+        payment_order_id: gatewayOrderId,
+        payment_snap_token: token,
+        payment_redirect_url: redirectUrl,
+        updated_at: new Date().toISOString(),
+      };
+      await writeLocalDb(db);
+      return {
+        alreadyPaid: false,
+        token,
+        redirectUrl,
+        gatewayOrderId,
+        clientKey: cfg.clientKey,
+        snapScriptUrl: cfg.snapScriptUrl,
+        order: await enrichOrderWithMedia(null, db.orders[idx]),
+      };
+    }
+  }
+
+  const { data: updated, error: updateErr } = await admin
+    .from("orders")
+    .update({
+      payment_provider: "midtrans",
+      payment_order_id: gatewayOrderId,
+      payment_snap_token: token,
+      payment_redirect_url: redirectUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", order.id)
+    .select("*, order_items(*)")
+    .single();
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  return {
+    alreadyPaid: false,
+    token,
+    redirectUrl,
+    gatewayOrderId,
+    clientKey: cfg.clientKey,
+    snapScriptUrl: cfg.snapScriptUrl,
+    order: await enrichOrderWithMedia(admin, updated),
+  };
+}
+
+/**
+ * Verifies an incoming Midtrans HTTP webhook notification and transitions paid orders to dikemas.
+ */
+export async function processMidtransWebhook(payload) {
+  const { configured, serverKey } = getMidtransConfig();
+  if (!configured) {
+    throw new Error("Midtrans Server Key belum dikonfigurasi.");
+  }
+
+  if (!verifyMidtransSignature(payload, serverKey)) {
+    const err = new Error("Signature webhook Midtrans tidak valid.");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const gatewayOrderId = String(payload?.order_id || "").trim();
+  if (!gatewayOrderId) {
+    throw new Error("order_id tidak ditemukan di payload Midtrans.");
+  }
+
+  if (!isSupabaseConfigured()) {
+    const db = await readLocalDb();
+    const found = db.orders.find(
+      (o) =>
+        o.payment_order_id === gatewayOrderId || o.order_code === gatewayOrderId
+    );
+    if (!found) {
+      return { ok: true, ignored: true, reason: "order_not_found" };
+    }
+    const result = await applyMidtransNotificationToOrder({
+      admin: null,
+      order: found,
+      payload,
+    });
+    return { ok: true, ...result };
+  }
+
+  const admin = createSupabaseAdminClient();
+  let { data: found, error } = await admin
+    .from("orders")
+    .select("*, order_items(*)")
+    .eq("payment_order_id", gatewayOrderId)
+    .maybeSingle();
+
+  if (!found && !error) {
+    const fallbackRes = await admin
+      .from("orders")
+      .select("*, order_items(*)")
+      .eq("order_code", gatewayOrderId)
+      .maybeSingle();
+    found = fallbackRes.data;
+    error = fallbackRes.error;
+  }
+
+  if (error) throw new Error(error.message);
+  if (!found) {
+    return { ok: true, ignored: true, reason: "order_not_found" };
+  }
+
+  const enriched = await enrichOrderWithMedia(admin, found);
+  const result = await applyMidtransNotificationToOrder({
+    admin,
+    order: enriched,
+    payload,
+  });
+  return { ok: true, ...result };
+}
+
+/**
+ * Actively queries Midtrans Core API transaction status for buyer checkout reconciliation (ideal for localhost).
+ */
+export async function syncMidtransPaymentStatus({ orderCode, whatsapp }) {
+  const { order } = await trackOrder(orderCode, whatsapp);
+  if (!order.payment_order_id) {
+    return { synced: false, order, transactionStatus: null };
+  }
+
+  const remoteStatus = await fetchMidtransTransactionStatus(
+    order.payment_order_id
+  );
+  if (!remoteStatus) {
+    return { synced: false, order, transactionStatus: null };
+  }
+
+  const admin = isSupabaseConfigured() ? createSupabaseAdminClient() : null;
+  const reconciled = await applyMidtransNotificationToOrder({
+    admin,
+    order,
+    payload: remoteStatus,
+  });
+
+  return {
+    synced: true,
+    order: reconciled.order,
+    paid: reconciled.paid,
+    transactionStatus: reconciled.transactionStatus,
+  };
 }

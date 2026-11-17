@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getPublicMidtransConfig } from "@/lib/midtrans";
 import { trackOrder } from "@/lib/store-repo";
 
 export async function GET(request) {
@@ -14,6 +15,7 @@ export async function GET(request) {
         qris_image_url: settings.qris_image_url,
         admin_whatsapp: settings.admin_whatsapp,
       },
+      midtransConfig: getPublicMidtransConfig(),
     });
   } catch (err) {
     return NextResponse.json(
