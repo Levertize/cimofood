@@ -17,8 +17,25 @@ import {
   isRealEnvValue,
   isSupabaseConfigured,
 } from "./supabase/config";
+import {
+  removeStorageObjectQuietly,
+  resolveOrderMediaUrls,
+  uploadImageToBucket,
+  validateImageUpload,
+} from "./media-storage";
 
 export { isSupabaseConfigured };
+
+async function enrichOrderWithMedia(admin, row) {
+  if (!row) return null;
+  const { order_items, ...rest } = row;
+  const mediaUrls = await resolveOrderMediaUrls(admin, row);
+  return {
+    ...rest,
+    items: order_items || rest.items || [],
+    ...mediaUrls,
+  };
+}
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-data.json");
 const PREVIEW_COOKIE = "cimofood_preview_admin";
@@ -331,7 +348,7 @@ export async function trackOrder(orderCode, whatsapp) {
         "Pesanan tidak ditemukan. Periksa kembali kode pesanan dan nomor WhatsApp."
       );
     }
-    return { order: found, settings };
+    return { order: await enrichOrderWithMedia(null, found), settings };
   }
 
   const admin = createSupabaseAdminClient();
@@ -349,27 +366,18 @@ export async function trackOrder(orderCode, whatsapp) {
     );
   }
 
-  const { order_items, ...rest } = order;
-  return { order: { ...rest, items: order_items || [] }, settings };
+  return { order: await enrichOrderWithMedia(admin, order), settings };
 }
 
 export async function attachPaymentProof({
   orderCode,
   whatsapp,
   fileBuffer,
-  fileName,
   mimeType,
 }) {
   const cleanCode = String(orderCode || "").trim().toUpperCase();
   const cleanWa = normalizeWhatsapp(whatsapp);
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
-  if (!allowedTypes.includes(mimeType)) {
-    throw new Error("Format bukti pembayaran harus JPG, PNG, atau WebP.");
-  }
-  if (fileBuffer.byteLength > 2 * 1024 * 1024) {
-    throw new Error("Ukuran gambar maksimal 2 MB.");
-  }
+  const { ext, toDataUrl } = validateImageUpload({ fileBuffer, mimeType });
 
   if (!isSupabaseConfigured()) {
     const db = await readLocalDb();
@@ -381,8 +389,7 @@ export async function attachPaymentProof({
     if (idx === -1) {
       throw new Error("Pesanan tidak ditemukan untuk kode & nomor WhatsApp ini.");
     }
-    const dataUrl = `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
-    db.orders[idx].payment_proof_url = dataUrl;
+    db.orders[idx].payment_proof_url = toDataUrl();
     if (
       ["menunggu_konfirmasi", "menunggu_pembayaran"].includes(
         db.orders[idx].status
@@ -392,7 +399,7 @@ export async function attachPaymentProof({
     }
     db.orders[idx].updated_at = new Date().toISOString();
     await writeLocalDb(db);
-    return { order: db.orders[idx] };
+    return { order: await enrichOrderWithMedia(null, db.orders[idx]) };
   }
 
   const admin = createSupabaseAdminClient();
@@ -408,17 +415,13 @@ export async function attachPaymentProof({
     throw new Error("Pesanan tidak ditemukan untuk kode & nomor WhatsApp ini.");
   }
 
-  const ext = fileName?.split(".").pop()?.toLowerCase() || "jpg";
   const storagePath = `${existing.order_code}-${Date.now()}.${ext}`;
-
-  const { error: uploadErr } = await admin.storage
-    .from("payment-proofs")
-    .upload(storagePath, fileBuffer, {
-      contentType: mimeType,
-      upsert: true,
-    });
-
-  if (uploadErr) throw new Error(uploadErr.message);
+  await uploadImageToBucket(admin, {
+    bucket: "payment-proofs",
+    objectPath: storagePath,
+    fileBuffer,
+    mimeType,
+  });
 
   const nextStatus = ["menunggu_konfirmasi", "menunggu_pembayaran"].includes(
     existing.status
@@ -438,8 +441,82 @@ export async function attachPaymentProof({
     .single();
 
   if (updateErr) throw new Error(updateErr.message);
-  const { order_items, ...rest } = updated;
-  return { order: { ...rest, items: order_items || [] } };
+  await removeStorageObjectQuietly(
+    admin,
+    "payment-proofs",
+    existing.payment_proof_url
+  );
+  return { order: await enrichOrderWithMedia(admin, updated) };
+}
+
+/**
+ * Marks a shipped order as received/completed by the buyer verified by order code + WhatsApp.
+ */
+export async function confirmOrderReceipt({ orderCode, whatsapp }) {
+  const cleanCode = String(orderCode || "").trim().toUpperCase();
+  const cleanWa = normalizeWhatsapp(whatsapp);
+  if (!cleanCode || !cleanWa) {
+    throw new Error("Kode pesanan dan nomor WhatsApp wajib disertakan.");
+  }
+
+  if (!isSupabaseConfigured()) {
+    const db = await readLocalDb();
+    const idx = db.orders.findIndex(
+      (o) =>
+        o.order_code.toUpperCase() === cleanCode &&
+        normalizeWhatsapp(o.customer_whatsapp) === cleanWa
+    );
+    if (idx === -1) {
+      throw new Error("Pesanan tidak ditemukan untuk kode & nomor WhatsApp ini.");
+    }
+    const existing = db.orders[idx];
+    if (existing.status === "selesai") {
+      return { order: await enrichOrderWithMedia(null, existing) };
+    }
+    if (existing.status !== "dikirim") {
+      throw new Error(
+        "Konfirmasi penerimaan hanya tersedia setelah pesanan diserahkan ke kurir."
+      );
+    }
+    db.orders[idx].status = "selesai";
+    db.orders[idx].updated_at = new Date().toISOString();
+    await writeLocalDb(db);
+    return { order: await enrichOrderWithMedia(null, db.orders[idx]) };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: existing, error: findErr } = await admin
+    .from("orders")
+    .select("*, order_items(*)")
+    .eq("order_code", cleanCode)
+    .eq("customer_whatsapp", cleanWa)
+    .maybeSingle();
+
+  if (findErr) throw new Error(findErr.message);
+  if (!existing) {
+    throw new Error("Pesanan tidak ditemukan untuk kode & nomor WhatsApp ini.");
+  }
+  if (existing.status === "selesai") {
+    return { order: await enrichOrderWithMedia(admin, existing) };
+  }
+  if (existing.status !== "dikirim") {
+    throw new Error(
+      "Konfirmasi penerimaan hanya tersedia setelah pesanan diserahkan ke kurir."
+    );
+  }
+
+  const { data: updated, error: updateErr } = await admin
+    .from("orders")
+    .update({
+      status: "selesai",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", existing.id)
+    .select("*, order_items(*)")
+    .single();
+
+  if (updateErr) throw new Error(updateErr.message);
+  return { order: await enrichOrderWithMedia(admin, updated) };
 }
 
 export async function getAuthenticatedAdmin() {
@@ -532,10 +609,9 @@ export async function signOutAdmin() {
 export async function listAdminOrders() {
   if (!isSupabaseConfigured()) {
     const db = await readLocalDb();
-    return db.orders.map((o) => ({
-      ...o,
-      payment_proof_signed_url: o.payment_proof_url || null,
-    }));
+    return Promise.all(
+      db.orders.map((order) => enrichOrderWithMedia(null, order))
+    );
   }
 
   const admin = createSupabaseAdminClient();
@@ -546,25 +622,9 @@ export async function listAdminOrders() {
 
   if (error) throw new Error(error.message);
 
-  const enriched = await Promise.all(
-    (data || []).map(async (row) => {
-      const { order_items, ...rest } = row;
-      let signedUrl = null;
-      if (row.payment_proof_url) {
-        const { data: signed } = await admin.storage
-          .from("payment-proofs")
-          .createSignedUrl(row.payment_proof_url, 3600);
-        signedUrl = signed?.signedUrl || null;
-      }
-      return {
-        ...rest,
-        items: order_items || [],
-        payment_proof_signed_url: signedUrl,
-      };
-    })
+  return Promise.all(
+    (data || []).map((row) => enrichOrderWithMedia(admin, row))
   );
-
-  return enriched;
 }
 
 export async function updateAdminOrder(orderId, payload) {
@@ -605,7 +665,7 @@ export async function updateAdminOrder(orderId, payload) {
       updated_at: new Date().toISOString(),
     };
     await writeLocalDb(db);
-    return db.orders[idx];
+    return enrichOrderWithMedia(null, db.orders[idx]);
   }
 
   const admin = createSupabaseAdminClient();
@@ -639,8 +699,7 @@ export async function updateAdminOrder(orderId, payload) {
     .single();
 
   if (updateErr) throw new Error(updateErr.message);
-  const { order_items, ...rest } = updated;
-  return { ...rest, items: order_items || [] };
+  return enrichOrderWithMedia(admin, updated);
 }
 
 export async function updateVariant(variantId, payload) {
@@ -883,4 +942,200 @@ export async function updateSiteSettings(payload) {
 
   if (error) throw new Error(error.message);
   return data;
+}
+
+/**
+ * Uploads or replaces the store QRIS image in public storage bucket product-images.
+ */
+export async function uploadStoreQrisImage({ fileBuffer, mimeType }) {
+  const { ext, toDataUrl } = validateImageUpload({ fileBuffer, mimeType });
+
+  if (!isSupabaseConfigured()) {
+    const db = await readLocalDb();
+    db.settings = {
+      ...db.settings,
+      qris_image_url: toDataUrl(),
+      updated_at: new Date().toISOString(),
+    };
+    await writeLocalDb(db);
+    return { settings: db.settings };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: prev } = await admin
+    .from("site_settings")
+    .select("qris_image_url")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const objectPath = `qris/qris-cimofood-${Date.now()}.${ext}`;
+  const { publicUrl } = await uploadImageToBucket(admin, {
+    bucket: "product-images",
+    objectPath,
+    fileBuffer,
+    mimeType,
+    isPublic: true,
+  });
+
+  const { data, error } = await admin
+    .from("site_settings")
+    .update({
+      qris_image_url: publicUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", 1)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  await removeStorageObjectQuietly(
+    admin,
+    "product-images",
+    prev?.qris_image_url
+  );
+  return { settings: data };
+}
+
+/**
+ * Removes the configured store QRIS image and deletes the previous object quietly.
+ */
+export async function clearStoreQrisImage() {
+  if (!isSupabaseConfigured()) {
+    const db = await readLocalDb();
+    db.settings = {
+      ...db.settings,
+      qris_image_url: null,
+      updated_at: new Date().toISOString(),
+    };
+    await writeLocalDb(db);
+    return { settings: db.settings };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: prev } = await admin
+    .from("site_settings")
+    .select("qris_image_url")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const { data, error } = await admin
+    .from("site_settings")
+    .update({
+      qris_image_url: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", 1)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  await removeStorageObjectQuietly(
+    admin,
+    "product-images",
+    prev?.qris_image_url
+  );
+  return { settings: data };
+}
+
+/**
+ * Attaches an admin 4-layer packing proof photo to an order in private bucket payment-proofs.
+ */
+export async function attachPackingProof({ orderId, fileBuffer, mimeType }) {
+  if (!orderId) {
+    throw new Error("ID pesanan wajib disertakan.");
+  }
+  const { ext, toDataUrl } = validateImageUpload({ fileBuffer, mimeType });
+
+  if (!isSupabaseConfigured()) {
+    const db = await readLocalDb();
+    const idx = db.orders.findIndex((o) => o.id === orderId);
+    if (idx === -1) throw new Error("Pesanan tidak ditemukan.");
+
+    db.orders[idx].packing_proof_url = toDataUrl();
+    db.orders[idx].updated_at = new Date().toISOString();
+    await writeLocalDb(db);
+    return { order: await enrichOrderWithMedia(null, db.orders[idx]) };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: existing, error: findErr } = await admin
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .single();
+
+  if (findErr || !existing) throw new Error("Pesanan tidak ditemukan.");
+
+  const storagePath = `packing/${existing.order_code}-${Date.now()}.${ext}`;
+  await uploadImageToBucket(admin, {
+    bucket: "payment-proofs",
+    objectPath: storagePath,
+    fileBuffer,
+    mimeType,
+  });
+
+  const { data: updated, error: updateErr } = await admin
+    .from("orders")
+    .update({
+      packing_proof_url: storagePath,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", existing.id)
+    .select("*, order_items(*)")
+    .single();
+
+  if (updateErr) throw new Error(updateErr.message);
+  await removeStorageObjectQuietly(
+    admin,
+    "payment-proofs",
+    existing.packing_proof_url
+  );
+  return { order: await enrichOrderWithMedia(admin, updated) };
+}
+
+/**
+ * Clears the 4-layer packing proof photo from an order.
+ */
+export async function clearPackingProof(orderId) {
+  if (!orderId) {
+    throw new Error("ID pesanan wajib disertakan.");
+  }
+
+  if (!isSupabaseConfigured()) {
+    const db = await readLocalDb();
+    const idx = db.orders.findIndex((o) => o.id === orderId);
+    if (idx === -1) throw new Error("Pesanan tidak ditemukan.");
+
+    db.orders[idx].packing_proof_url = null;
+    db.orders[idx].updated_at = new Date().toISOString();
+    await writeLocalDb(db);
+    return { order: await enrichOrderWithMedia(null, db.orders[idx]) };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: existing, error: findErr } = await admin
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .single();
+
+  if (findErr || !existing) throw new Error("Pesanan tidak ditemukan.");
+
+  const { data: updated, error: updateErr } = await admin
+    .from("orders")
+    .update({
+      packing_proof_url: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", existing.id)
+    .select("*, order_items(*)")
+    .single();
+
+  if (updateErr) throw new Error(updateErr.message);
+  await removeStorageObjectQuietly(
+    admin,
+    "payment-proofs",
+    existing.packing_proof_url
+  );
+  return { order: await enrichOrderWithMedia(admin, updated) };
 }

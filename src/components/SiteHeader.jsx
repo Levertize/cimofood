@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ORDER_STATUS_META } from "@/lib/constants";
+import {
+  syncRecentOrderStatuses,
+  useRecentOrders,
+} from "@/lib/recent-orders";
 import { useCart } from "./CartProvider";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -15,7 +20,26 @@ const NAV_ITEMS = [
 export function SiteHeader() {
   const pathname = usePathname();
   const { totalCount, setDrawerOpen } = useCart();
+  const recentOrders = useRecentOrders();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const syncedOnceRef = useRef(false);
+
+  const activeOrders = recentOrders.filter(
+    (item) => !["selesai", "dibatalkan"].includes(item.status)
+  );
+  const primaryActive = activeOrders[0] || null;
+  const primaryMeta = primaryActive
+    ? ORDER_STATUS_META[primaryActive.status] || {
+        shortLabel: primaryActive.status,
+        tone: "amber",
+      }
+    : null;
+
+  useEffect(() => {
+    if (syncedOnceRef.current || activeOrders.length === 0) return;
+    syncedOnceRef.current = true;
+    syncRecentOrderStatuses(activeOrders);
+  }, [activeOrders]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-subtle bg-canvas/95 backdrop-blur-sm">
@@ -34,13 +58,18 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`min-h-11 inline-flex items-center rounded-md px-3.5 text-sm font-semibold transition-colors ${
+                className={`min-h-11 inline-flex items-center gap-1.5 rounded-md px-3.5 text-sm font-semibold transition-colors ${
                   active
                     ? "bg-sand text-ink underline decoration-2 underline-offset-4"
                     : "text-muted hover:bg-sand hover:text-ink"
                 }`}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.href === "/cek-pesanan" && activeOrders.length > 0 && (
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-forest px-1.5 py-0.5 text-[11px] font-bold text-white tabular-nums">
+                    {activeOrders.length}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -101,17 +130,65 @@ export function SiteHeader() {
                   <Link
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`min-h-11 flex items-center rounded-md px-3 text-base font-semibold ${
+                    className={`min-h-11 flex items-center justify-between rounded-md px-3 text-base font-semibold ${
                       active ? "bg-sand text-ink" : "text-muted hover:bg-sand"
                     }`}
                   >
-                    {item.label}
+                    <span>{item.label}</span>
+                    {item.href === "/cek-pesanan" && activeOrders.length > 0 && (
+                      <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-forest px-2 py-0.5 text-xs font-bold text-white tabular-nums">
+                        {activeOrders.length}
+                      </span>
+                    )}
                   </Link>
                 </li>
               );
             })}
           </ul>
         </nav>
+      )}
+
+      {primaryActive && primaryMeta && (
+        <div className="border-t border-subtle bg-sand/90">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs sm:px-6">
+            <div className="flex flex-wrap items-center gap-2 text-ink">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${
+                  primaryMeta.tone === "green"
+                    ? "bg-forest"
+                    : primaryMeta.tone === "red"
+                    ? "bg-chili"
+                    : "bg-amber-bg"
+                }`}
+                aria-hidden="true"
+              />
+              <span className="font-semibold tabular-nums">
+                Pesanan {primaryActive.orderCode}:
+              </span>
+              <span className="rounded-full border border-subtle bg-surface px-2.5 py-0.5 font-semibold">
+                {primaryMeta.shortLabel}
+              </span>
+              {activeOrders.length > 1 && (
+                <span className="text-muted">
+                  (+{activeOrders.length - 1} pesanan lain)
+                </span>
+              )}
+            </div>
+
+            <Link
+              href={`/cek-pesanan?code=${encodeURIComponent(
+                primaryActive.orderCode
+              )}&wa=${encodeURIComponent(primaryActive.customerWhatsapp)}`}
+              className="font-semibold text-forest underline-offset-2 hover:underline"
+            >
+              {primaryActive.status === "menunggu_pembayaran"
+                ? "Bayar Sekarang"
+                : primaryActive.status === "dikirim"
+                ? "Konfirmasi Diterima"
+                : "Lihat Status & Detail"}
+            </Link>
+          </div>
+        </div>
       )}
     </header>
   );

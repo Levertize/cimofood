@@ -13,6 +13,7 @@ export default async function CekPesananPage({ searchParams }) {
   const sp = await searchParams;
   const code = sp?.code ? String(sp.code) : "";
   const wa = sp?.wa ? String(sp.wa) : "";
+  const method = sp?.method ? String(sp.method) : "midtrans_auto";
 
   const { settings } = await getSiteSettings();
 
@@ -41,6 +42,7 @@ export default async function CekPesananPage({ searchParams }) {
         <TrackOrderView
           initialCode={code}
           initialWa={wa}
+          initialMethod={method}
           initialResult={initialResult}
           initialError={initialError}
         />

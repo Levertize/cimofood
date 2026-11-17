@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ORDER_STATUS_META } from "@/lib/constants";
+import { ADMIN_ORDER_STATUS_OPTIONS, ORDER_STATUS_META } from "@/lib/constants";
 import {
   calculateSalesSummary,
   formatRupiah,
@@ -13,10 +13,10 @@ import {
 
 const ORDER_TABS = [
   { id: "semua", label: "Semua" },
-  { id: "menunggu_konfirmasi", label: "Perlu Ongkir WA" },
-  { id: "verifikasi_bayar", label: "Cek Bukti Bayar" },
-  { id: "siap_proses", label: "Siap Ambil & Packing" },
-  { id: "selesai_kirim", label: "Dikirim / Selesai" },
+  { id: "cek_ongkir", label: "Cek Ongkir" },
+  { id: "menunggu_bayar", label: "Menunggu Bayar" },
+  { id: "dikemas", label: "Sedang Dikemas" },
+  { id: "selesai_kirim", label: "Dikirim & Selesai" },
 ];
 
 export function AdminDashboard({
@@ -49,7 +49,16 @@ export function AdminDashboard({
   const [reportNow, setReportNow] = useState(0);
   const [savingSettings, setSavingSettings] = useState(false);
 
+  const [qrisFile, setQrisFile] = useState(null);
+  const [uploadingQris, setUploadingQris] = useState(false);
+  const [packingFile, setPackingFile] = useState(null);
+  const [uploadingPacking, setUploadingPacking] = useState(false);
+  const [drawerFeedback, setDrawerFeedback] = useState("");
+  const [drawerError, setDrawerError] = useState("");
+
   const modalRef = useRef(null);
+  const qrisInputRef = useRef(null);
+  const packingInputRef = useRef(null);
 
   useEffect(() => {
     if (!selectedOrder) return;
@@ -66,16 +75,21 @@ export function AdminDashboard({
     setEditShipping(String(order.shipping_cost ?? 0));
     setEditStatus(order.status);
     setEditTracking(order.tracking_number || "");
+    setPackingFile(null);
+    if (packingInputRef.current) packingInputRef.current.value = "";
+    setDrawerFeedback("");
+    setDrawerError("");
     setErrorMsg("");
     setFeedback("");
   }
 
-  async function handleSaveOrder(e) {
-    e.preventDefault();
+  async function persistOrderUpdate(nextStatus = editStatus) {
     if (!selectedOrder) return;
     setSavingOrder(true);
     setErrorMsg("");
     setFeedback("");
+    setDrawerFeedback("");
+    setDrawerError("");
 
     try {
       const res = await fetch("/api/admin/orders", {
@@ -84,7 +98,7 @@ export function AdminDashboard({
         body: JSON.stringify({
           orderId: selectedOrder.id,
           shipping_cost: Number(editShipping || 0),
-          status: editStatus,
+          status: nextStatus,
           tracking_number: editTracking,
         }),
       });
@@ -93,15 +107,93 @@ export function AdminDashboard({
 
       const updated = {
         ...data.order,
-        payment_proof_signed_url: selectedOrder.payment_proof_signed_url,
+        payment_proof_signed_url:
+          data.order.payment_proof_signed_url ??
+          selectedOrder.payment_proof_signed_url,
+        packing_proof_signed_url:
+          data.order.packing_proof_signed_url ??
+          selectedOrder.packing_proof_signed_url,
       };
+      setEditStatus(updated.status);
       setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
       setSelectedOrder(updated);
-      setFeedback(`Pesanan ${updated.order_code} diperbarui.`);
+      const msg = `Pesanan ${updated.order_code} diperbarui.`;
+      setDrawerFeedback(msg);
+      setFeedback(msg);
     } catch (err) {
+      setDrawerError(err.message);
       setErrorMsg(err.message);
     } finally {
       setSavingOrder(false);
+    }
+  }
+
+  async function handleSaveOrder(e) {
+    e.preventDefault();
+    await persistOrderUpdate(editStatus);
+  }
+
+  async function handleUploadPackingProof() {
+    if (!selectedOrder || !packingFile) return;
+    setUploadingPacking(true);
+    setDrawerError("");
+    setDrawerFeedback("");
+    setErrorMsg("");
+    setFeedback("");
+    try {
+      const formData = new FormData();
+      formData.append("orderId", selectedOrder.id);
+      formData.append("proof", packingFile);
+
+      const res = await fetch("/api/admin/orders/packing-proof", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengunggah foto packing.");
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === data.order.id ? data.order : o))
+      );
+      setSelectedOrder(data.order);
+      setPackingFile(null);
+      if (packingInputRef.current) packingInputRef.current.value = "";
+      const msg = `Foto bukti packing 4 lapis untuk ${data.order.order_code} berhasil diunggah.`;
+      setDrawerFeedback(msg);
+      setFeedback(msg);
+    } catch (err) {
+      setDrawerError(err.message);
+    } finally {
+      setUploadingPacking(false);
+    }
+  }
+
+  async function handleRemovePackingProof() {
+    if (!selectedOrder?.packing_proof_signed_url) return;
+    setUploadingPacking(true);
+    setDrawerError("");
+    setDrawerFeedback("");
+    try {
+      const res = await fetch(
+        `/api/admin/orders/packing-proof?orderId=${encodeURIComponent(
+          selectedOrder.id
+        )}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menghapus foto packing.");
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === data.order.id ? data.order : o))
+      );
+      setSelectedOrder(data.order);
+      const msg = `Foto bukti packing ${data.order.order_code} dihapus.`;
+      setDrawerFeedback(msg);
+      setFeedback(msg);
+    } catch (err) {
+      setDrawerError(err.message);
+    } finally {
+      setUploadingPacking(false);
     }
   }
 
@@ -214,7 +306,13 @@ export function AdminDashboard({
       const res = await fetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({
+          admin_whatsapp: settings?.admin_whatsapp || "",
+          bank_info: settings?.bank_info || "",
+          packing_fee: settings?.packing_fee ?? 2000,
+          pirt_number: settings?.pirt_number || "",
+          halal_number: settings?.halal_number || "",
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan pengaturan.");
@@ -227,6 +325,50 @@ export function AdminDashboard({
     }
   }
 
+  async function handleUploadQris() {
+    if (!qrisFile) return;
+    setUploadingQris(true);
+    setErrorMsg("");
+    setFeedback("");
+    try {
+      const formData = new FormData();
+      formData.append("qris", qrisFile);
+
+      const res = await fetch("/api/admin/settings/qris", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengunggah gambar QRIS.");
+      setSettings(data.settings);
+      setQrisFile(null);
+      if (qrisInputRef.current) qrisInputRef.current.value = "";
+      setFeedback("Gambar QRIS resmi CimoFood berhasil diunggah.");
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setUploadingQris(false);
+    }
+  }
+
+  async function handleRemoveQris() {
+    if (!settings?.qris_image_url) return;
+    setUploadingQris(true);
+    setErrorMsg("");
+    setFeedback("");
+    try {
+      const res = await fetch("/api/admin/settings/qris", { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menghapus gambar QRIS.");
+      setSettings(data.settings);
+      setFeedback("Gambar QRIS resmi toko dihapus.");
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setUploadingQris(false);
+    }
+  }
+
   async function handleLogout() {
     await fetch("/api/admin/session", { method: "DELETE" });
     router.push("/admin/login");
@@ -236,11 +378,11 @@ export function AdminDashboard({
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
       if (orderFilter === "semua") return true;
-      if (orderFilter === "menunggu_konfirmasi")
-        return ["menunggu_konfirmasi", "menunggu_pembayaran"].includes(o.status);
-      if (orderFilter === "verifikasi_bayar")
-        return o.status === "verifikasi_bayar";
-      if (orderFilter === "siap_proses")
+      if (orderFilter === "cek_ongkir")
+        return o.status === "menunggu_konfirmasi";
+      if (orderFilter === "menunggu_bayar")
+        return ["menunggu_pembayaran", "verifikasi_bayar"].includes(o.status);
+      if (orderFilter === "dikemas")
         return ["dibayar", "dikemas"].includes(o.status);
       if (orderFilter === "selesai_kirim")
         return ["dikirim", "selesai"].includes(o.status);
@@ -888,6 +1030,78 @@ export function AdminDashboard({
                 </button>
               </form>
 
+              <div className="mt-6 border-t border-subtle pt-5 space-y-3">
+                <h3 className="text-sm font-semibold text-ink">
+                  Gambar QRIS Resmi CimoFood
+                </h3>
+                {settings?.qris_image_url ? (
+                  <div className="flex flex-wrap items-center gap-3 rounded-xl border border-subtle bg-canvas p-3">
+                    <div className="rounded-lg bg-white p-1.5 border border-subtle">
+                      <img
+                        src={settings.qris_image_url}
+                        alt="QRIS Resmi CimoFood"
+                        className="h-24 w-24 object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-40 space-y-1.5">
+                      <p className="text-xs font-medium text-ink">
+                        QRIS aktif &amp; tampil di halaman Cek Pesanan pembeli.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href={settings.qris_image_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-forest underline-offset-2 hover:underline"
+                        >
+                          Lihat Penuh
+                        </a>
+                        <button
+                          type="button"
+                          onClick={handleRemoveQris}
+                          disabled={uploadingQris}
+                          className="text-xs font-semibold text-chili-hover underline-offset-2 hover:underline disabled:opacity-60"
+                        >
+                          Hapus QRIS
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted">
+                    Belum ada gambar QRIS. Upload gambar QRIS (JPG, PNG, WebP,
+                    maks. 2 MB) agar tampil saat pembeli membuka halaman Cek
+                    Pesanan.
+                  </p>
+                )}
+
+                <div className="space-y-2">
+                  <label htmlFor="upload-qris-input" className="sr-only">
+                    Upload file gambar QRIS toko
+                  </label>
+                  <input
+                    ref={qrisInputRef}
+                    id="upload-qris-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => setQrisFile(e.target.files?.[0] || null)}
+                    className="block w-full rounded-md border border-control bg-canvas p-2 text-xs text-ink"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleUploadQris}
+                    disabled={uploadingQris || !qrisFile}
+                    className="min-h-10 w-full rounded-full border border-control bg-sand px-4 text-xs font-semibold text-ink hover:border-ink disabled:opacity-60"
+                  >
+                    {uploadingQris
+                      ? "Mengunggah QRIS..."
+                      : settings?.qris_image_url
+                      ? "Ganti Gambar QRIS Toko"
+                      : "Upload Gambar QRIS Toko"}
+                  </button>
+                </div>
+              </div>
+
               {backendStatus && (
                 <div className="mt-6 border-t border-subtle pt-5 space-y-2.5">
                   <h3 className="text-sm font-semibold text-ink">
@@ -1014,6 +1228,23 @@ export function AdminDashboard({
               </button>
             </div>
 
+            {drawerFeedback && (
+              <div
+                role="status"
+                className="rounded-lg border border-forest bg-sand p-3 text-xs font-medium text-forest"
+              >
+                {drawerFeedback}
+              </div>
+            )}
+            {drawerError && (
+              <div
+                role="alert"
+                className="rounded-lg border border-chili bg-canvas p-3 text-xs font-medium text-chili-hover"
+              >
+                {drawerError}
+              </div>
+            )}
+
             <div className="rounded-xl border border-subtle bg-canvas p-4 text-sm space-y-1.5">
               <p>
                 <strong>Alamat:</strong> {selectedOrder.shipping_address}
@@ -1052,7 +1283,133 @@ export function AdminDashboard({
               )}
             </div>
 
+            <div className="space-y-2.5 border-t border-subtle pt-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-ink">
+                  Foto Bukti Packing Aman 4 Lapis
+                </h3>
+                {selectedOrder.packing_proof_signed_url && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePackingProof}
+                    disabled={uploadingPacking}
+                    className="text-xs font-semibold text-chili-hover underline-offset-2 hover:underline disabled:opacity-60"
+                  >
+                    Hapus Foto
+                  </button>
+                )}
+              </div>
+
+              {selectedOrder.packing_proof_signed_url ? (
+                <div className="overflow-hidden rounded-xl border border-subtle bg-canvas p-2">
+                  <img
+                    src={selectedOrder.packing_proof_signed_url}
+                    alt={`Foto packing ${selectedOrder.order_code}`}
+                    className="max-h-56 w-full rounded-lg object-contain"
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-muted">
+                  Unggah foto paket sebelum dikirim (JPG, PNG, WebP, maks. 2 MB)
+                  agar pembeli dapat memantau keamanan packing di Cek Pesanan.
+                </p>
+              )}
+
+              <div className="space-y-2">
+                <label htmlFor="upload-packing-input" className="sr-only">
+                  Upload foto bukti packing pesanan
+                </label>
+                <input
+                  ref={packingInputRef}
+                  id="upload-packing-input"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => setPackingFile(e.target.files?.[0] || null)}
+                  className="block w-full rounded-md border border-control bg-canvas p-2 text-xs text-ink"
+                />
+                <button
+                  type="button"
+                  onClick={handleUploadPackingProof}
+                  disabled={uploadingPacking || !packingFile}
+                  className="min-h-10 w-full rounded-full border border-control bg-sand px-4 text-xs font-semibold text-ink hover:border-ink disabled:opacity-60"
+                >
+                  {uploadingPacking
+                    ? "Mengunggah Foto Packing..."
+                    : selectedOrder.packing_proof_signed_url
+                    ? "Ganti Foto Bukti Packing"
+                    : "Unggah Foto Bukti Packing"}
+                </button>
+              </div>
+            </div>
+
             <form onSubmit={handleSaveOrder} className="space-y-4 border-t border-subtle pt-4">
+              {selectedOrder.status === "menunggu_konfirmasi" && (
+                <div className="rounded-xl border border-amber-bg bg-sand p-3.5 space-y-2">
+                  <p className="text-xs font-semibold text-ink">
+                    Langkah Berikutnya: Konfirmasi Stok &amp; Ongkir
+                  </p>
+                  <button
+                    type="button"
+                    disabled={savingOrder}
+                    onClick={() => persistOrderUpdate("menunggu_pembayaran")}
+                    className="min-h-10 w-full rounded-full bg-forest px-4 text-xs font-semibold text-white hover:opacity-95 disabled:opacity-60"
+                  >
+                    {savingOrder
+                      ? "Menyimpan..."
+                      : "Simpan Ongkir & Aktifkan Tagihan Pembeli"}
+                  </button>
+                </div>
+              )}
+
+              {["menunggu_pembayaran", "verifikasi_bayar"].includes(
+                selectedOrder.status
+              ) && (
+                <div className="rounded-xl border border-forest bg-sand p-3.5 space-y-2">
+                  <p className="text-xs font-semibold text-ink">
+                    {selectedOrder.status === "verifikasi_bayar"
+                      ? "Bukti bayar sudah masuk. Konfirmasi agar langsung dikemas:"
+                      : "Sudah terima pelunasan dari pembeli?"}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={savingOrder}
+                    onClick={() => persistOrderUpdate("dikemas")}
+                    className="min-h-10 w-full rounded-full bg-forest px-4 text-xs font-semibold text-white hover:opacity-95 disabled:opacity-60"
+                  >
+                    {savingOrder
+                      ? "Memproses..."
+                      : "Tandai Lunas -> Sedang Dikemas"}
+                  </button>
+                </div>
+              )}
+
+              {["dikemas", "dibayar"].includes(selectedOrder.status) && (
+                <div className="rounded-xl border border-forest bg-sand p-3.5 space-y-2">
+                  <p className="text-xs font-semibold text-ink">
+                    Paket 4 lapis siap diserahkan ke {selectedOrder.courier}?
+                  </p>
+                  <button
+                    type="button"
+                    disabled={savingOrder}
+                    onClick={() => persistOrderUpdate("dikirim")}
+                    className="min-h-10 w-full rounded-full bg-forest px-4 text-xs font-semibold text-white hover:opacity-95 disabled:opacity-60"
+                  >
+                    {savingOrder
+                      ? "Memproses..."
+                      : "Serahkan ke Kurir & Tandai Dalam Perjalanan"}
+                  </button>
+                </div>
+              )}
+
+              {selectedOrder.status === "dikirim" && (
+                <div className="rounded-xl border border-subtle bg-canvas p-3.5 text-xs text-muted">
+                  Status saat ini <strong>Diserahkan ke Kurir &amp; Dalam Perjalanan</strong>.
+                  Pesanan akan otomatis menjadi <strong>Selesai</strong> setelah
+                  pembeli menekan tombol <em>Pesanan Sudah Diterima</em> di
+                  halaman Cek Pesanan.
+                </div>
+              )}
+
               <div>
                 <label
                   htmlFor="edit-shipping"
@@ -1075,7 +1432,7 @@ export function AdminDashboard({
                   htmlFor="edit-status"
                   className="block text-sm font-semibold text-ink"
                 >
-                  Status Pesanan
+                  Status Pesanan (Ringkas)
                 </label>
                 <select
                   id="edit-status"
@@ -1083,9 +1440,15 @@ export function AdminDashboard({
                   onChange={(e) => setEditStatus(e.target.value)}
                   className="mt-1 min-h-11 w-full rounded-md border border-control bg-canvas px-3 text-sm"
                 >
-                  {Object.entries(ORDER_STATUS_META).map(([key, val]) => (
+                  {!ADMIN_ORDER_STATUS_OPTIONS.includes(editStatus) &&
+                    ORDER_STATUS_META[editStatus] && (
+                      <option value={editStatus}>
+                        {ORDER_STATUS_META[editStatus].label}
+                      </option>
+                    )}
+                  {ADMIN_ORDER_STATUS_OPTIONS.map((key) => (
                     <option key={key} value={key}>
-                      {val.label}
+                      {ORDER_STATUS_META[key]?.label || key}
                     </option>
                   ))}
                 </select>

@@ -101,6 +101,7 @@ export function CartProvider({ children }) {
             variantId: variant.id,
             productId: product.id,
             productName: product.name,
+            imageUrl: product.image_url || "/placeholders/product-placeholder.svg",
             sizeLabel: variant.size_label,
             weightGrams: variant.weight_grams,
             sellPrice: variant.sell_price,

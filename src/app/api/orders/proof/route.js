@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readImageFromFormData } from "@/lib/media-storage";
 import { attachPaymentProof } from "@/lib/store-repo";
 
 export async function POST(request) {
@@ -6,24 +7,17 @@ export async function POST(request) {
     const formData = await request.formData();
     const orderCode = formData.get("orderCode");
     const whatsapp = formData.get("whatsapp");
-    const file = formData.get("proof");
-
-    if (!file || typeof file === "string") {
-      return NextResponse.json(
-        { error: "Pilih file gambar bukti pembayaran terlebih dahulu." },
-        { status: 400 }
-      );
-    }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
+    const { fileBuffer, mimeType } = await readImageFromFormData(
+      formData,
+      ["proof", "file"],
+      "Pilih file gambar bukti pembayaran terlebih dahulu."
+    );
 
     const { order } = await attachPaymentProof({
       orderCode,
       whatsapp,
       fileBuffer,
-      fileName: file.name,
-      mimeType: file.type,
+      mimeType,
     });
 
     return NextResponse.json({ order });

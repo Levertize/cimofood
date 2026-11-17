@@ -1,43 +1,84 @@
 export const COURIERS = [
-  { id: "Mandiri/Lokal", label: "Pengiriman Mandiri / Lokal (Area Dekat)" },
-  { id: "Anteraja", label: "Anteraja" },
-  { id: "J&T", label: "J&T Express" },
-  { id: "JNE", label: "JNE" },
+  {
+    id: "Mandiri/Lokal",
+    label: "Pengiriman Mandiri / Lokal",
+    badge: "Area Dekat",
+    eta: "Hari ini - 1 hari",
+    description: "Diantar langsung untuk area sekitar tanpa lewat gudang sortir.",
+  },
+  {
+    id: "J&T",
+    label: "J&T Express",
+    badge: "Reguler Cepat",
+    eta: "1 - 3 hari kerja",
+    description: "Jaringan luas dengan tracking resi real-time nasional.",
+  },
+  {
+    id: "JNE",
+    label: "JNE Reguler / YES",
+    badge: "Seluruh Indonesia",
+    eta: "2 - 4 hari kerja",
+    description: "Cocok untuk pengiriman paket berat atau luar pulau.",
+  },
+  {
+    id: "Anteraja",
+    label: "Anteraja",
+    badge: "Hemat & Terjadwal",
+    eta: "2 - 4 hari kerja",
+    description: "Pilihan ekonomis dengan pickup kurir langsung.",
+  },
+];
+
+export const PAYMENT_METHODS = [
+  {
+    id: "midtrans_auto",
+    label: "Bayar Otomatis (QRIS Instan, VA Bank, E-Wallet)",
+    badge: "Rekomendasi",
+    description:
+      "Pembayaran otomatis via Midtrans Snap setelah ongkos kirim dikonfirmasi admin. Status langsung masuk Sedang Dikemas tanpa perlu upload bukti manual.",
+  },
+  {
+    id: "manual_transfer",
+    label: "Transfer Bank / Scan QRIS Toko (Manual)",
+    badge: "Alternatif",
+    description:
+      "Transfer ke rekening resmi CimoFood atau scan QRIS toko di halaman Cek Pesanan, lalu unggah foto bukti transfer untuk dicek admin.",
+  },
 ];
 
 export const ORDER_STATUS_META = {
   menunggu_konfirmasi: {
     label: "Menunggu Konfirmasi Stok & Ongkir",
-    shortLabel: "Perlu Konfirmasi",
+    shortLabel: "Cek Ongkir",
     tone: "amber",
   },
   menunggu_pembayaran: {
-    label: "Menunggu Pembayaran & Upload Bukti",
-    shortLabel: "Menunggu Bayar",
+    label: "Menunggu Pembayaran",
+    shortLabel: "Siap Dibayar",
     tone: "amber",
   },
   verifikasi_bayar: {
-    label: "Bukti Diterima, Sedang Diverifikasi",
-    shortLabel: "Cek Bukti Bayar",
+    label: "Bukti Transfer Dicek Admin",
+    shortLabel: "Cek Bukti",
     tone: "amber",
   },
   dibayar: {
-    label: "Pembayaran Lunas, Menunggu Pengambilan",
-    shortLabel: "Dibayar",
+    label: "Pembayaran Lunas, Siap Dikemas",
+    shortLabel: "Lunas",
     tone: "green",
   },
   dikemas: {
-    label: "Sedang Dikemas Sesuai SOP 4 Lapis",
-    shortLabel: "Dikemas",
+    label: "Sedang Dikemas (SOP 4 Lapis)",
+    shortLabel: "Sedang Dikemas",
     tone: "green",
   },
   dikirim: {
-    label: "Paket Dikirim via Ekspedisi",
-    shortLabel: "Dikirim",
+    label: "Diserahkan ke Kurir & Dalam Perjalanan",
+    shortLabel: "Dalam Perjalanan",
     tone: "green",
   },
   selesai: {
-    label: "Pesanan Selesai & Diterima",
+    label: "Selesai (Pesanan Diterima Pembeli)",
     shortLabel: "Selesai",
     tone: "green",
   },
@@ -51,12 +92,28 @@ export const ORDER_STATUS_META = {
 export const ORDER_FLOW_STEPS = [
   "menunggu_konfirmasi",
   "menunggu_pembayaran",
-  "verifikasi_bayar",
-  "dibayar",
   "dikemas",
   "dikirim",
   "selesai",
 ];
+
+export const ADMIN_ORDER_STATUS_OPTIONS = [
+  "menunggu_konfirmasi",
+  "menunggu_pembayaran",
+  "dikemas",
+  "dikirim",
+  "selesai",
+  "dibatalkan",
+];
+
+/**
+ * Maps any database order status (including legacy intermediate statuses) to the 5-step visual index.
+ */
+export function getOrderFlowStepIndex(status) {
+  if (status === "verifikasi_bayar") return 1;
+  if (status === "dibayar") return 2;
+  return ORDER_FLOW_STEPS.indexOf(status);
+}
 
 export const PACKING_LAYERS = [
   {
